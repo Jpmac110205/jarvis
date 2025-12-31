@@ -11,7 +11,7 @@ import { sendChatMessage } from "./services/api";
 
 export interface Message {
   id: number;
-  author: "user" | "jarvis";
+  author: "user" | "prodigy";
   content: string;
   timestamp: string;
 }
@@ -20,7 +20,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      author: "jarvis",
+      author: "prodigy",
       content: "Welcome back sir! How may I assist you today?",
       timestamp:new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -65,7 +65,7 @@ export default function App() {
         // If there's an error, add an error message
         const errorMessage: Message = {
           id: Date.now() + 1,
-          author: "jarvis",
+          author: "prodigy",
           content: response.reply,
           timestamp: new Date().toLocaleTimeString([], {
             hour: "2-digit",
@@ -77,7 +77,7 @@ export default function App() {
         // Add AI response to the UI
         const aiMessage: Message = {
           id: Date.now() + 1,
-          author: "jarvis",
+          author: "prodigy",
           content: response.reply,
           timestamp: new Date().toLocaleTimeString([], {
             hour: "2-digit",
@@ -90,7 +90,7 @@ export default function App() {
       // Handle unexpected errors
       const errorMessage: Message = {
         id: Date.now() + 1,
-        author: "jarvis",
+        author: "prodigy",
         content: "Sorry, an unexpected error occurred. Please try again.",
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -152,7 +152,7 @@ function MiddleHeader({ middle }: { middle: string }) {
   return (
     <header className="w-full max-w-3xl px-6 py-4 border-b border-neutral-800/50 bg-neutral-900/30 backdrop-blur-sm">
       <h1 className="text-lg font-semibold text-neutral-100 tracking-tight">
-        {titleMap[middle] ?? "Jarvis"}
+        {titleMap[middle] ?? "Prodigy"}
       </h1>
     </header>
   );

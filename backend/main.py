@@ -110,7 +110,7 @@ async def export_conversation(request: Request):
         
         export_data = {
             "report_metadata": {
-                "tool": "Jarvis",
+                "tool": "Prodigy",
                 "version": "1.0",
                 "disclaimer": "Personal use only, not ready for production"
             },
