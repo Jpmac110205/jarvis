@@ -7,6 +7,7 @@ import {LeftPanel} from "./components/LeftPanel/Left";
 import { ProfilePanel } from "./components/MiddlePanel/Profile";
 import { ShortcutsPanel } from "./components/RightPanel/Shortcuts";
 import { DailyCalendar } from "./components/RightPanel/DailyCalendar";
+import { sendChatMessage } from "./services/api";
 
 export interface Message {
   id: number;
@@ -33,23 +34,71 @@ export default function App() {
   >("chat");
   const [input, setInput] = useState("");
 
-  function sendMessage() {
+  async function sendMessage() {
     if (!input.trim()) return;
 
-    setMessages((m) => [
-      ...m,
-      {
-        id: Date.now(),
-        author: "user",
-        content: input,
+    const userMessageText = input.trim();
+    setInput(""); // Clear input immediately
+
+    // Create user message
+    const userMessage: Message = {
+      id: Date.now(),
+      author: "user",
+      content: userMessageText,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+
+    // Add user message to the UI immediately (optimistic update)
+    setMessages((m) => [...m, userMessage]);
+
+    // Get current history (excluding the welcome message for API call, or include all)
+    const currentHistory = messages;
+
+    try {
+      // Send message to backend
+      const response = await sendChatMessage(userMessageText, currentHistory);
+
+      if (response.error) {
+        // If there's an error, add an error message
+        const errorMessage: Message = {
+          id: Date.now() + 1,
+          author: "jarvis",
+          content: response.reply,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        };
+        setMessages((m) => [...m, errorMessage]);
+      } else {
+        // Add AI response to the UI
+        const aiMessage: Message = {
+          id: Date.now() + 1,
+          author: "jarvis",
+          content: response.reply,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        };
+        setMessages((m) => [...m, aiMessage]);
+      }
+    } catch (error) {
+      // Handle unexpected errors
+      const errorMessage: Message = {
+        id: Date.now() + 1,
+        author: "jarvis",
+        content: "Sorry, an unexpected error occurred. Please try again.",
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
-      },
-    ]);
-
-    setInput("");
+      };
+      setMessages((m) => [...m, errorMessage]);
+    }
   }
 
   return (
@@ -93,7 +142,7 @@ function RightPanel() {
 
 function MiddleHeader({ middle }: { middle: string }) {
   const titleMap: Record<string, string> = {
-    chat: "Jarvis Chat",
+    chat: "Prodigy",
     tasks: "Tasks",
     profile: "Profile",
     settings: "Settings",
