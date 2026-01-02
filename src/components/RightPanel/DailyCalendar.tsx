@@ -1,11 +1,13 @@
 export function DailyCalendar() {
-  const reminders = [
+  const connectedToGoogle = false; 
+
+  const reminders: any[] = [
     { title: "Finish OS assignment", done: false },
     { title: "Team meeting", done: true },
     { title: "Email client", done: false },
   ];
 
-  const agenda = [
+  const agenda: any[] = [
     { time: "09:00 AM", event: "Operating Systems" },
     { time: "11:00 AM", event: "Code Review" },
     { time: "02:00 PM", event: "Project Update" },
@@ -16,7 +18,37 @@ export function DailyCalendar() {
       <h2 className="text-base font-semibold mb-5 text-neutral-100 tracking-tight">Today's Overview</h2>
 
       {/* Reminders */}
-      <div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50 mb-4">
+      <Reminders />
+      <br></br>
+
+      {/* Schedule for Today */}
+      <Calendar />
+    </>
+  );
+  function Reminders() {
+    if (!connectedToGoogle) {
+    return (
+      <div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50">
+        <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase tracking-wide">Reminders</h3>
+        <p className="text-sm text-neutral-400 mb-4">
+          Connect your Google account to sync and view your reminders here.
+        </p>
+      </div>
+    );
+    }
+    else {
+      if (reminders.length === 0) {
+        return (
+          <div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50">
+            <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase tracking-wide">Reminders</h3>
+            <p className="text-sm text-neutral-400 text-center">
+              You have no reminders for today.
+            </p>
+          </div>
+        );
+      }
+      else {
+      return (<div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50 mb-4">
         <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase tracking-wide">Reminders</h3>
         <ul className="space-y-2">
           {reminders.map((reminder, idx) => (
@@ -39,10 +71,35 @@ export function DailyCalendar() {
             </li>
           ))}
         </ul>
-      </div>
+      </div>);
+      }
+    }
+  }
 
-      {/* Schedule for Today */}
+  function Calendar() {
+    if (!connectedToGoogle) {
+    return (
       <div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50">
+        <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase tracking-wide">Calendar</h3>
+        <p className="text-sm text-neutral-400 mb-4">
+          Connect your Google account to sync and view your calendar here.
+        </p>
+      </div>
+    );
+  }
+    else {
+      if(agenda.length === 0) {
+        return (
+          <div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50">
+            <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase tracking-wide">Schedule for Today</h3>
+            <p className="text-sm text-neutral-400 text-center">
+              You have no events scheduled for today.
+            </p>
+          </div>
+        );
+      }
+      else {  
+      return (<div className="w-full max-w-md bg-neutral-800/60 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-neutral-700/50">
         <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase tracking-wide">Schedule for Today</h3>
         <ul className="space-y-2">
           {agenda.map((item, idx) => (
@@ -56,6 +113,8 @@ export function DailyCalendar() {
           ))}
         </ul>
       </div>
-    </>
-  );
+      );
+    }
+    }
+  }
 }

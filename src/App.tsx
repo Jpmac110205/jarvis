@@ -33,6 +33,7 @@ export default function App() {
     "chat" | "tasks" | "profile" | "settings" | "calendar"
   >("chat");
   const [input, setInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
 
   async function sendMessage() {
     if (!input.trim()) return;
@@ -53,6 +54,9 @@ export default function App() {
 
     // Add user message to the UI immediately (optimistic update)
     setMessages((m) => [...m, userMessage]);
+
+    // Show typing indicator
+    setIsTyping(true);
 
     // Get current history (excluding the welcome message for API call, or include all)
     const currentHistory = messages;
@@ -98,6 +102,9 @@ export default function App() {
         }),
       };
       setMessages((m) => [...m, errorMessage]);
+    } finally {
+      // Hide typing indicator
+      setIsTyping(false);
     }
   }
 
@@ -113,6 +120,7 @@ export default function App() {
           input={input}
           onChange={setInput}
           onSend={sendMessage}
+          isTyping={isTyping}
         />
       </main>
 
@@ -166,16 +174,18 @@ function MiddlePanel({
   input,
   onChange,
   onSend,
+  isTyping,
 }: {
   middle: "chat" | "tasks" | "profile" | "settings" | "calendar";
   messages: Message[];
   input: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  isTyping: boolean;
 }) {
   switch (middle) {
     case "chat":
-      return <Chat messages={messages} input={input} onChange={onChange} onSend={onSend} />;
+      return <Chat messages={messages} input={input} onChange={onChange} onSend={onSend} isTyping={isTyping} />;
     case "tasks":
       return <TasksPanel />;
     case "profile":

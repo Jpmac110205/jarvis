@@ -63,7 +63,7 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Title</label>
               <input
                 type="text"
-                placeholder="AI Engineer Intern"
+                defaultValue="AI Engineer Intern"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
             </div>
@@ -71,7 +71,7 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Location</label>
               <input
                 type="text"
-                placeholder="Feasterville, PA"
+                defaultValue="Feasterville, PA"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
             </div>

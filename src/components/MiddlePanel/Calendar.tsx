@@ -56,9 +56,6 @@ export function CalendarPanel() {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-neutral-100">{monthLabel}</h2>
-          <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-100 border border-blue-500/30">
-            {selectedDate === today.toISOString().slice(0, 10) ? "Today" : "Selected"}
-          </span>
         </div>
         <div className="flex items-center gap-3 text-xs text-neutral-400">
           <div className="flex items-center gap-2">
@@ -104,18 +101,18 @@ export function CalendarPanel() {
                 <button
                   key={day.key}
                   onClick={() => setSelectedDate(day.key)}
-                  className={`h-16 w-full rounded-xl border text-sm flex flex-col items-start justify-between p-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg
-                    ${day.isToday ? "border-blue-500/60 bg-blue-500/15 text-blue-50" : "border-neutral-800/60 bg-neutral-800/40 text-neutral-100"}
-                    ${isSelected ? "ring-2 ring-blue-400/60" : ""}
+                  className={`h-12 sm:h-16 w-full rounded-xl border text-xs sm:text-sm flex flex-col items-start justify-between p-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg
+                  ${day.isToday ? "border-blue-500/60 bg-blue-500/15 text-blue-50" : "border-neutral-800/60 bg-neutral-800/40 text-neutral-100"}
+                  ${isSelected ? "ring-2 ring-blue-400/60" : ""}
                   `}
                 >
-                  <span className="text-xs font-semibold">{day.label}</span>
+                  <span className="text-[10px] sm:text-xs font-semibold">{day.label}</span>
                   {hasEvents ? (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-100 border border-emerald-500/30">
-                      {eventsByDate[day.key].length} event{eventsByDate[day.key].length > 1 ? "s" : ""}
-                    </span>
+                  <span className="text-[8px] sm:text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-100 border border-emerald-500/30">
+                    {eventsByDate[day.key].length} event{eventsByDate[day.key].length > 1 ? "s" : ""}
+                  </span>
                   ) : (
-                    <span className="text-[10px] text-neutral-500">No events</span>
+                  <span className="text-[8px] sm:text-[10px] text-neutral-500">No events</span>
                   )}
                 </button>
               );
@@ -157,7 +154,7 @@ export function CalendarPanel() {
                   <p className="text-sm font-semibold text-neutral-50">{e.title}</p>
                   <p className="text-xs text-neutral-400">{e.location ?? "TBD"}</p>
                 </div>
-                <span className="text-sm font-mono text-blue-100 bg-blue-500/15 px-2 py-1 rounded-md border border-blue-500/30">
+                <span className="text-xs sm:text-sm font-mono text-blue-100 bg-blue-500/15 px-2 py-1 rounded-md border border-blue-500/30">
                   {e.time}
                 </span>
               </div>

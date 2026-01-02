@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import {useLayoutEffect, useRef } from "react";
 import type { Message } from "../../App";
 import { PlusIcon, MicrophoneIcon } from '@heroicons/react/24/solid';
 
@@ -7,15 +7,17 @@ export default function Chat({
   input,
   onChange,
   onSend,
+  isTyping = false,
 }: {
   messages: Message[];
   input: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  isTyping?: boolean;
 }) {
   return (
     <div className="flex-1 w-full max-w-3xl flex flex-col overflow-hidden">
-      <ChatPanel messages={messages} />
+      <ChatPanel messages={messages} isTyping={isTyping} />
       <ChatInput input={input} onChange={onChange} onSend={onSend} />
     </div>
   );
@@ -23,7 +25,7 @@ export default function Chat({
 
 /* --------- Internal components (not exported) --------- */
 
-function ChatPanel({ messages }: { messages: Message[] }) {
+function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Always stick to bottom when messages change (chat-like behavior).
@@ -33,7 +35,7 @@ function ChatPanel({ messages }: { messages: Message[] }) {
     requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
-  }, [messages.length]);
+  }, [messages.length, isTyping]);
 
   return (
     <div
@@ -63,6 +65,21 @@ function ChatPanel({ messages }: { messages: Message[] }) {
           </div>
         </div>
       ))}
+      {isTyping && <TypingIndicator />}
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="rounded-2xl px-4 py-3 shadow-lg backdrop-blur-sm bg-neutral-800/60 border border-neutral-700/50 text-neutral-100 flex items-center gap-2">
+        <div className="flex gap-1">
+          <span className="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
     </div>
   );
 }
