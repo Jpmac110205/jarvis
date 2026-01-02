@@ -1,53 +1,169 @@
+import { useMemo, useState } from "react";
+
 export function CalendarPanel() {
-  // Generate placeholder days
-  const days = Array.from({ length: 7 }, (_, i) => ({
-    day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i],
-    date: 9 + i,
-    events: [
-      { time: "10:00 AM", title: "Meeting" },
-      { time: "2:00 PM", title: "Task Review" },
-    ],
-  }));
+  const today = useMemo(() => new Date(), []);
+  const [selectedDate, setSelectedDate] = useState<string>(() => today.toISOString().slice(0, 10));
+
+  const eventsByDate = useMemo<Record<string, { time: string; title: string; location?: string }[]>>(
+    () => ({
+       [new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString().slice(0, 10)]: [
+        { time: "11:00", title: "Client Sync", location: "Meet" },
+      ],
+      [new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3).toISOString().slice(0, 10)]: [
+        { time: "16:00", title: "Code Review", location: "Room 2A" },
+      ],
+    }),
+    [today]
+  );
+
+  const { monthLabel, weeks } = useMemo(() => {
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const startOfMonth = new Date(year, month, 1);
+    const startDay = startOfMonth.getDay(); // 0 = Sun
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const days: { key: string; label: number; isToday: boolean }[] = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month, day);
+      const key = date.toISOString().slice(0, 10);
+      days.push({
+        key,
+        label: day,
+        isToday: key === today.toISOString().slice(0, 10),
+      });
+    }
+
+    // Pad with blanks before the first day to align to the week grid
+    const blanks = Array.from({ length: startDay }, () => null);
+    const padded = [...blanks, ...days];
+    while (padded.length % 7 !== 0) padded.push(null);
+
+    const weeksArr: ({ key: string; label: number; isToday: boolean } | null)[][] = [];
+    for (let i = 0; i < padded.length; i += 7) {
+      weeksArr.push(padded.slice(i, i + 7));
+    }
+
+    const formatter = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
+    return { monthLabel: formatter.format(today), weeks: weeksArr };
+  }, [today]);
+
+  const selectedEvents = eventsByDate[selectedDate] ?? [];
 
   return (
     <div className="w-full max-w-3xl px-6 py-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-semibold text-neutral-100">Calendar</h2>
-        <button className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-medium shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-105 active:scale-95">
-          Add Event
-        </button>
-      </div>
-
-      {/* Week overview */}
-      <div className="grid grid-cols-7 gap-3">
-        {days.map((d) => (
-          <div
-            key={d.day}
-            className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-3 border border-neutral-700/50 flex flex-col gap-2 hover:border-blue-500/30 hover:shadow-lg transition-all duration-200"
-          >
-            <div className="flex justify-between items-center text-sm text-neutral-300 font-semibold">
-              <span className="text-neutral-400">{d.day}</span>
-              <span className="text-neutral-100">{d.date}</span>
-            </div>
-            <div className="flex flex-col gap-1.5 mt-2">
-              {d.events.map((e, idx) => (
-                <div
-                  key={idx}
-                  className="bg-gradient-to-r from-blue-600/80 to-blue-500/80 text-white text-xs px-2 py-1.5 rounded-lg shadow-md border border-blue-400/20"
-                >
-                  <div className="font-medium">{e.time}</div>
-                  <div className="text-blue-100">{e.title}</div>
-                </div>
-              ))}
-            </div>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-neutral-100">{monthLabel}</h2>
+          <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-100 border border-blue-500/30">
+            {selectedDate === today.toISOString().slice(0, 10) ? "Today" : "Selected"}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-neutral-400">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full border border-neutral-600" />
+            <span>Normal</span>
           </div>
-        ))}
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-blue-500" />
+            <span>Today</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-emerald-500" />
+            <span>Has events</span>
+          </div>
+        </div>
       </div>
 
-      {/* Placeholder for empty days or details */}
-      <div className="mt-4 text-sm text-neutral-400 bg-neutral-800/30 rounded-xl p-4 border border-neutral-700/30 text-center">
-        Select a day to see event details.
+      {/* Month grid */}
+      <div className="bg-neutral-900/40 border border-neutral-800/50 rounded-2xl p-4 shadow-xl backdrop-blur">
+        <div className="grid grid-cols-7 text-xs font-semibold text-neutral-400 mb-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div key={d} className="text-center tracking-wide">
+              {d}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {weeks.map((week, wi) =>
+            week.map((day, di) => {
+              if (!day) {
+                return (
+                  <div
+                    key={`blank-${wi}-${di}`}
+                    className="h-16 rounded-xl border border-neutral-800/40 bg-neutral-900/30"
+                  />
+                );
+              }
+
+              const hasEvents = Boolean(eventsByDate[day.key]);
+              const isSelected = selectedDate === day.key;
+
+              return (
+                <button
+                  key={day.key}
+                  onClick={() => setSelectedDate(day.key)}
+                  className={`h-16 w-full rounded-xl border text-sm flex flex-col items-start justify-between p-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg
+                    ${day.isToday ? "border-blue-500/60 bg-blue-500/15 text-blue-50" : "border-neutral-800/60 bg-neutral-800/40 text-neutral-100"}
+                    ${isSelected ? "ring-2 ring-blue-400/60" : ""}
+                  `}
+                >
+                  <span className="text-xs font-semibold">{day.label}</span>
+                  {hasEvents ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-100 border border-emerald-500/30">
+                      {eventsByDate[day.key].length} event{eventsByDate[day.key].length > 1 ? "s" : ""}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-neutral-500">No events</span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Day agenda */}
+      <div className="bg-neutral-900/40 border border-neutral-800/50 rounded-2xl p-4 shadow-xl backdrop-blur flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-neutral-400">Agenda</p>
+            <p className="text-lg font-semibold text-neutral-50">
+              {new Date(selectedDate).toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
+          </div>
+          <button className="px-3 py-1.5 text-sm rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-500 hover:to-blue-400 transition-all shadow-blue-500/20 shadow">
+            Add event
+          </button>
+        </div>
+
+        {selectedEvents.length === 0 ? (
+          <div className="text-sm text-neutral-400 border border-dashed border-neutral-700/70 rounded-xl p-4 text-center">
+            No events for this day.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {selectedEvents.map((e, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between rounded-xl border border-neutral-700/60 bg-neutral-800/50 px-4 py-3 shadow-sm"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-neutral-50">{e.title}</p>
+                  <p className="text-xs text-neutral-400">{e.location ?? "TBD"}</p>
+                </div>
+                <span className="text-sm font-mono text-blue-100 bg-blue-500/15 px-2 py-1 rounded-md border border-blue-500/30">
+                  {e.time}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

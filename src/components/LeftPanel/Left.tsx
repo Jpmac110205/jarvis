@@ -1,3 +1,4 @@
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 export function LeftPanel({
   middle,
   onSelect,
@@ -52,16 +53,7 @@ export function LeftPanel({
           onClick={() => onSelect("chat")}
           title="Chat"
         >
-          <svg
-            className="w-5 h-5 mr-3 transition-transform group-hover:scale-110"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 20 20"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" />
-            <path d="M15 0H4a1 1 0 000 2h11a1 1 0 100-2z" />
-          </svg>
+          <ChatBubbleLeftRightIcon className="w-5 h-5 mr-3 transition-transform group-hover:scale-110" />
           <span className="font-medium">Chat</span>
         </button>
         <button

@@ -3,46 +3,142 @@ export function ProfilePanel() {
     <div className="w-full max-w-3xl px-6 py-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-semibold text-neutral-100">Profile</h2>
-        <button className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-medium shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-105 active:scale-95">
-          Save Changes
-        </button>
+        <div>
+          <h2 className="text-xl font-semibold text-neutral-100">Profile</h2>
+          <p className="text-sm text-neutral-400">Manage your account info, identity, and connections.</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="px-4 py-2 rounded-xl border border-neutral-700/60 text-neutral-200 hover:border-blue-500/30 hover:text-white transition-all">
+            Reset
+          </button>
+          <button className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-medium shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-105 active:scale-95">
+            Save Changes
+          </button>
+        </div>
       </div>
 
-      {/* Profile Info */}
-      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-6 border border-neutral-700/50 flex flex-col gap-5 shadow-lg">
-        <div>
-          <label className="text-sm font-medium text-neutral-300 mb-2 block">Name</label>
-          <input
-            type="text"
-            placeholder="Your Name"
-            className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-          />
+      {/* Top summary */}
+      <section className="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-5 shadow-lg backdrop-blur flex gap-4 items-center">
+        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 grid place-items-center text-xl font-bold text-white shadow-lg shadow-blue-500/30">
+          JM
         </div>
-        <div>
-          <label className="text-sm font-medium text-neutral-300 mb-2 block">Email</label>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-          />
+        <div className="flex-1">
+          <p className="text-sm text-neutral-400">Workspace member</p>
+          <p className="text-lg font-semibold text-neutral-50">James McAllister</p>
+          <p className="text-xs text-neutral-400">Joined Jan 2026 · Verified email</p>
         </div>
-        <div>
-          <label className="text-sm font-medium text-neutral-300 mb-2 block">Password</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-          />
+        <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
+            <p className="text-xs text-neutral-400">Tasks</p>
+            <p className="text-lg font-semibold text-neutral-50">12</p>
+          </div>
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
+            <p className="text-xs text-neutral-400">Chats</p>
+            <p className="text-lg font-semibold text-neutral-50">87</p>
+          </div>
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
+            <p className="text-xs text-neutral-400">AI Actions</p>
+            <p className="text-lg font-semibold text-neutral-50">34</p>
+          </div>
         </div>
+      </section>
 
-        {/* Account actions */}
-        <div className="flex flex-col gap-3 mt-2 pt-4 border-t border-neutral-700/50">
-          <button className="w-full py-3 px-4 bg-neutral-700/40 rounded-xl hover:bg-neutral-700/60 border border-neutral-600/50 hover:border-blue-500/30 transition-all duration-200 text-left text-neutral-100 font-medium">
-            API Keys
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Profile</h3>
+            <span className="text-[11px] text-neutral-400">Public</span>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Display name</label>
+              <input
+                type="text"
+                defaultValue="Jimmy"
+                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Title</label>
+              <input
+                type="text"
+                placeholder="AI Engineer Intern"
+                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Location</label>
+              <input
+                type="text"
+                placeholder="Feasterville, PA"
+                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Account</h3>
+            <span className="text-[11px] text-neutral-400">Private</span>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Email</label>
+              <input
+                type="email"
+                defaultValue="jpmac1102@outlook.com"
+                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm text-neutral-300 rounded-xl border border-neutral-700/60 bg-neutral-800/50 px-3 py-2">
+              <span>Two-factor authentication</span>
+              <button className="px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-100 hover:bg-blue-500/15 transition-all text-xs">
+                Enable
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Connections */}
+      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Connections</h3>
+          <span className="text-[11px] text-neutral-400">OAuth</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
+            type="button"
+          >
+            <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#EA4335" d="M24 9.5c3.27 0 6.2 1.13 8.52 3.35l6.36-6.36C34.9 2.47 29.86 0 24 0 14.64 0 6.4 5.38 2.52 13.22l7.53 5.85C11.62 13.07 17.27 9.5 24 9.5z" />
+              <path fill="#4285F4" d="M46.5 24.5c0-1.57-.14-3.09-.39-4.55H24v9.02h12.7c-.55 2.97-2.2 5.49-4.69 7.18l7.36 5.71C43.78 38.24 46.5 31.88 46.5 24.5z" />
+              <path fill="#FBBC05" d="M10.05 28.07A14.5 14.5 0 019.5 24c0-1.4.24-2.76.55-4.07l-7.53-5.85A23.93 23.93 0 000 24c0 3.8.9 7.38 2.52 10.92l7.53-5.85z" />
+              <path fill="#34A853" d="M24 48c6.48 0 11.92-2.13 15.89-5.79l-7.36-5.71c-2.04 1.38-4.66 2.2-8.53 2.2-6.73 0-12.38-3.57-14.95-8.92l-7.53 5.85C6.4 42.62 14.64 48 24 48z" />
+              <path fill="none" d="M0 0h48v48H0z" />
+            </svg>
+            <span>Connect Google</span>
           </button>
-          <button className="w-full py-3 px-4 bg-gradient-to-r from-red-600/20 to-red-500/10 rounded-xl hover:from-red-600/30 hover:to-red-500/20 border border-red-500/30 hover:border-red-500/50 transition-all duration-200 text-left text-red-400 font-medium shadow-lg shadow-red-500/10">
-            Delete Account
+          <button
+            className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
+            type="button"
+          >
+            <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L3 6.5V9c0 5 3.5 9.74 9 11 5.5-1.26 9-6 9-11V6.5L12 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="M12 11.5L3.5 6.75M12 11.5L20.5 6.75M12 11.5V21" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+            </svg>
+            <span>Connect GitHub</span>
           </button>
         </div>
       </section>

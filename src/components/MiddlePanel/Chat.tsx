@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Message } from "../../App";
 import { PlusIcon, MicrophoneIcon } from '@heroicons/react/24/solid';
 
@@ -21,9 +22,24 @@ export default function Chat({
 }
 
 /* --------- Internal components (not exported) --------- */
+
 function ChatPanel({ messages }: { messages: Message[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Always stick to bottom when messages change (chat-like behavior).
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [messages.length]);
+
   return (
-    <div className="flex-1 px-4 py-2 overflow-y-auto space-y-6 scrollbar-thin">
+    <div
+      ref={containerRef}
+      className="flex-1 px-4 py-2 overflow-y-auto space-y-6 scrollbar-thin"
+    >
       {messages.map((msg) => (
         <div
           key={msg.id}
