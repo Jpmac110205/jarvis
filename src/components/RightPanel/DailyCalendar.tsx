@@ -1,5 +1,10 @@
 export function DailyCalendar() {
   const connectedToGoogle = false; 
+  
+  //const res = await fetch("http://localhost:8080/events");
+  //const events = await res.json();
+  //console.log(events);
+
 
   const reminders: any[] = [
     { title: "Finish OS assignment", done: false },

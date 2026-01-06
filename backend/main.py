@@ -10,6 +10,16 @@ from fastapi.params import Form
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
+from fastapi.responses import RedirectResponse
+import requests
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from dotenv import load_dotenv
+
+
+
+
 # ==================== SETUP ====================
 # Load .env file from the backend directory
 backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +55,21 @@ def create_system_message():
             f"Be helpful, accurate, and efficient. You are a persistent extension of the user's memory and productivity system."
         )
     )
+    
+def get_upcoming_events(access_token):
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+    params = {
+        "maxResults": 10,
+        "orderBy": "startTime",
+        "singleEvents": True,
+        "timeMin": "2026-01-05T00:00:00Z",  # ISO format for now
+    }
+    r = requests.get(url, headers=headers, params=params)
+    return r.json()
+
 
 # Initialize ChatOpenAI model
 # Initialize ChatOpenAI model (line 53-58)
@@ -131,6 +156,50 @@ async def export_conversation(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+FRONTEND_URL = "http://localhost:5173"
+REDIRECT_URI = "https://undefied-spriggy-germaine.ngrok-free.dev/auth/google/callback"
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+
+user_tokens = {}  # key: user_id or session, value: token_data
+
+@app.get("/auth/google/callback")
+async def google_callback(request: Request):
+    code = request.query_params.get("code")
+    if not code:
+        return JSONResponse({"error": "No code provided"}, status_code=400)
+
+    # Exchange code for tokens
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "redirect_uri": REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
+    r = requests.post(token_url, data=data)
+    token_data = r.json()
+
+    # ===== Store token_data securely =====
+    # For demo: store by session or dummy user_id
+    user_id = "demo_user"
+    user_tokens[user_id] = token_data
+
+    # ===== Redirect back to frontend =====
+    frontend_url = "http://localhost:5173"  # or your deployed frontend
+    return RedirectResponse(frontend_url)
+
+@app.get("/events")
+async def events():
+    user_id = "demo_user"  # get this from session / auth
+    token_data = user_tokens.get(user_id)
+    if not token_data:
+        return JSONResponse({"error": "User not authenticated"}, status_code=401)
+    
+    access_token = token_data["access_token"]
+    events = get_upcoming_events(access_token)
+    return events
 
 
 
