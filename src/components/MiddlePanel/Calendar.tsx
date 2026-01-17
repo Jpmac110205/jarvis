@@ -1,24 +1,36 @@
 import { useMemo, useState } from "react";
+import { useGoogleData } from "../../contexts/GoogleDataProvider";
 
 export function CalendarPanel() {
+  const { agenda: googleEvents, connected, loading } = useGoogleData();
   const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState<string>(() => today.toISOString().slice(0, 10));
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
 
-  const eventsByDate = useMemo<Record<string, { time: string; title: string; location?: string }[]>>(
-    () => ({
-       [new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString().slice(0, 10)]: [
-        { time: "11:00", title: "Client Sync", location: "Meet" },
-      ],
-      [new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3).toISOString().slice(0, 10)]: [
-        { time: "16:00", title: "Code Review", location: "Room 2A" },
-      ],
-    }),
-    [today]
-  );
+  // Convert Google agenda to events by date format
+  const eventsByDate = useMemo<Record<string, { time: string; title: string; location?: string }[]>>(() => {
+    const events: Record<string, { time: string; title: string; location?: string }[]> = {};
+    
+    googleEvents.forEach((event) => {
+      const dateKey = event.date; // Use the date from the event
+      
+      if (!events[dateKey]) {
+        events[dateKey] = [];
+      }
+      
+      events[dateKey].push({
+        time: event.time,
+        title: event.event,
+        location: undefined, // Google Calendar location would need to be added to your backend
+      });
+    });
+    
+    return events;
+  }, [googleEvents]);
 
   const { monthLabel, weeks } = useMemo(() => {
-    const year = today.getFullYear();
-    const month = today.getMonth();
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
     const startOfMonth = new Date(year, month, 1);
     const startDay = startOfMonth.getDay(); // 0 = Sun
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -45,10 +57,54 @@ export function CalendarPanel() {
     }
 
     const formatter = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
-    return { monthLabel: formatter.format(today), weeks: weeksArr };
-  }, [today]);
+    return { monthLabel: formatter.format(currentMonth), weeks: weeksArr };
+  }, [currentMonth, today]);
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
+
+  function connectGoogle() {
+    window.location.href = "http://localhost:8080/auth/google/login";
+  }
+
+  function previousMonth() {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  }
+
+  function nextMonth() {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  }
+
+  function goToToday() {
+    setCurrentMonth(new Date());
+    setSelectedDate(today.toISOString().slice(0, 10));
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full max-w-3xl px-6 py-6 flex items-center justify-center">
+        <p className="text-neutral-400">Loading calendar...</p>
+      </div>
+    );
+  }
+
+  if (!connected) {
+    return (
+      <div className="w-full max-w-3xl px-6 py-6 flex flex-col items-center justify-center gap-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-neutral-100 mb-2">Calendar</h2>
+          <p className="text-sm text-neutral-400 mb-4">
+            Connect your Google account to view your calendar.
+          </p>
+        </div>
+        <button
+          onClick={connectGoogle}
+          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-105 active:scale-95"
+        >
+          Connect Google
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-3xl px-6 py-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin">
@@ -56,20 +112,52 @@ export function CalendarPanel() {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-neutral-100">{monthLabel}</h2>
+          <span className="text-xs text-neutral-400 bg-neutral-800/40 px-2 py-1 rounded-full border border-neutral-700/50">
+            Synced with Google
+          </span>
         </div>
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full border border-neutral-600" />
-            <span>Normal</span>
+            <button
+              onClick={previousMonth}
+              className="p-1.5 rounded-lg hover:bg-neutral-800/60 transition-colors text-neutral-300"
+              aria-label="Previous month"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={goToToday}
+              className="px-3 py-1 text-xs rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 transition-colors text-neutral-300"
+            >
+              Today
+            </button>
+            <button
+              onClick={nextMonth}
+              className="p-1.5 rounded-lg hover:bg-neutral-800/60 transition-colors text-neutral-300"
+              aria-label="Next month"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-blue-500" />
-            <span>Today</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span>Has events</span>
-          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-neutral-400 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full border border-neutral-600" />
+          <span>Normal</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-blue-500" />
+          <span>Today</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-emerald-500" />
+          <span>Has events</span>
         </div>
       </div>
 
@@ -108,11 +196,11 @@ export function CalendarPanel() {
                 >
                   <span className="text-[10px] sm:text-xs font-semibold">{day.label}</span>
                   {hasEvents ? (
-                  <span className="text-[8px] sm:text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-100 border border-emerald-500/30">
-                    {eventsByDate[day.key].length} event{eventsByDate[day.key].length > 1 ? "s" : ""}
-                  </span>
+                    <span className="text-[8px] sm:text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-100 border border-emerald-500/30">
+                      {eventsByDate[day.key].length} event{eventsByDate[day.key].length > 1 ? "s" : ""}
+                    </span>
                   ) : (
-                  <span className="text-[8px] sm:text-[10px] text-neutral-500">No events</span>
+                    <span className="text-[8px] sm:text-[10px] text-neutral-500">No events</span>
                   )}
                 </button>
               );
@@ -134,9 +222,9 @@ export function CalendarPanel() {
               })}
             </p>
           </div>
-          <button className="px-3 py-1.5 text-sm rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-500 hover:to-blue-400 transition-all shadow-blue-500/20 shadow">
-            Add event
-          </button>
+          <span className="text-xs text-neutral-400 italic px-3 py-1.5">
+            Read-only
+          </span>
         </div>
 
         {selectedEvents.length === 0 ? (
@@ -152,7 +240,9 @@ export function CalendarPanel() {
               >
                 <div>
                   <p className="text-sm font-semibold text-neutral-50">{e.title}</p>
-                  <p className="text-xs text-neutral-400">{e.location ?? "TBD"}</p>
+                  {e.location && (
+                    <p className="text-xs text-neutral-400">{e.location}</p>
+                  )}
                 </div>
                 <span className="text-xs sm:text-sm font-mono text-blue-100 bg-blue-500/15 px-2 py-1 rounded-md border border-blue-500/30">
                   {e.time}

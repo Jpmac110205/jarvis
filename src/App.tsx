@@ -9,6 +9,7 @@ import { ShortcutsPanel } from "./components/RightPanel/Shortcuts";
 import { DailyCalendar } from "./components/RightPanel/DailyCalendar";
 import { sendChatMessage } from "./services/api";
 
+
 export interface Message {
   id: number;
   author: "user" | "prodigy";
@@ -17,6 +18,7 @@ export interface Message {
 }
 
 export default function App() {
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -124,7 +126,7 @@ export default function App() {
         />
       </main>
 
-      <RightPanel />
+      <RightPanel/>
     </div>
   );
 }
@@ -133,11 +135,14 @@ export default function App() {
 
 /* ---------------- Right Panel ---------------- */
 
+
 function RightPanel() {
   return (
     <aside className="w-64 bg-neutral-900/40 backdrop-blur-xl border-l border-neutral-800/50 p-4 flex flex-col h-screen shadow-2xl">
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        <DailyCalendar />
+        <DailyCalendar 
+
+        />
       </div>
       <div className="mt-auto border-t border-neutral-800/50 pt-4">
         {ShortcutsPanel()}

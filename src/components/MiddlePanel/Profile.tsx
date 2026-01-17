@@ -1,4 +1,6 @@
 import { DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
+import { useState as reactUseState } from 'react';
+import { useGoogleConnection } from "../../contexts/GoogleConnectionProvider";
 
 export function ProfilePanel() {
   return (
@@ -27,20 +29,20 @@ export function ProfilePanel() {
         <div className="flex-1">
           <p className="text-sm text-neutral-400">Workspace member</p>
           <p className="text-lg font-semibold text-neutral-50">James McAllister</p>
-          <p className="text-xs text-neutral-400">Joined Jan 2026 · Verified email</p>
+          <p className="text-xs text-neutral-400">Joined NULL</p>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
           <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
             <p className="text-xs text-neutral-400">Tasks</p>
-            <p className="text-lg font-semibold text-neutral-50">12</p>
+            <p className="text-lg font-semibold text-neutral-50">NULL</p>
           </div>
           <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
             <p className="text-xs text-neutral-400">Chats</p>
-            <p className="text-lg font-semibold text-neutral-50">87</p>
+            <p className="text-lg font-semibold text-neutral-50">NULL</p>
           </div>
           <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
             <p className="text-xs text-neutral-400">AI Actions</p>
-            <p className="text-lg font-semibold text-neutral-50">34</p>
+            <p className="text-lg font-semibold text-neutral-50">NULL</p>
           </div>
         </div>
       </section>
@@ -119,7 +121,29 @@ export function ProfilePanel() {
           <span className="text-[11px] text-neutral-400">OAuth</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-<button
+          <GoogleButton />
+          <AppleButton />
+        </div>
+      </section>
+
+      {/* Custom System Prompt */}
+      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Custom System Prompt</h3>
+          <span className="text-[11px] text-neutral-400">AI Behavior</span>
+        </div>
+        <textarea
+          placeholder="E.g., You are an expert in software engineering and you like helping with homework and being a friendly companion."
+          className="w-full h-32 bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500 resize-none font-mono text-sm"
+        />
+      </section>
+    </div>
+  );
+}
+function GoogleButton () {
+  const { connectedToGoogle } = useGoogleConnection();
+  if (!connectedToGoogle) {
+    return (<button
   className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
   type="button"
   onClick={() => window.location.href = "https://accounts.google.com/o/oauth2/v2/auth" +
@@ -138,28 +162,51 @@ export function ProfilePanel() {
               <path fill="none" d="M0 0h48v48H0z" />
             </svg>
             <span>Connect Google</span>
-          </button>
-          <button
+          </button>);  }
+    else {
+      return (
+        <button
+      className="w-full py-3 px-4 rounded-xl border border-green-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
+      type="button"
+    >
+              <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#34A853" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16 16z" />
+                <path fill="#34A853" d="M34.59 15.41l-11.3 11.3-5.88-5.88a2 2 0 10-2.83 2.83l7.29 7.29a2 2 0 002.83 0l12.71-12.71a2 2 0 10-2.83-2.83z" />
+                <path fill="none" d="M0 0h48v48H0z" />
+              </svg>
+              <span>Google Connected</span>
+            </button>
+      )
+    }
+}
+function AppleButton() {
+  const [connectedToApple] = reactUseState(false);
+
+  if (!connectedToApple){
+    return (
+    <button
             className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
             type="button"
           >
             <DevicePhoneMobileIcon className="w-5 h-5" />
             <span>Connect Apple ID</span>
           </button>
-        </div>
-      </section>
-
-      {/* Custom System Prompt */}
-      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Custom System Prompt</h3>
-          <span className="text-[11px] text-neutral-400">AI Behavior</span>
-        </div>
-        <textarea
-          placeholder="E.g., You are an expert in software engineering and you like helping with homework and being a friendly companion."
-          className="w-full h-32 bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500 resize-none font-mono text-sm"
-        />
-      </section>
-    </div>
-  );
+    );
+  }
+  else {
+    return (
+      <button
+      className="w-full py-3 px-4 rounded-xl border border-green-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
+      type="button"
+    >
+      <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#34A853" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16 16z" />
+                <path fill="#34A853" d="M34.59 15.41l-11.3 11.3-5.88-5.88a2 2 0 10-2.83 2.83l7.29 7.29a2 2 0 002.83 0l12.71-12.71a2 2 0 10-2.83-2.83z" />
+                <path fill="none" d="M0 0h48v48H0z" />
+              </svg>
+      <span>Apple ID Connected</span>
+    </button>
+    )
+  }
 }
+

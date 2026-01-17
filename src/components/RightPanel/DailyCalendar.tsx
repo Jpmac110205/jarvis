@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useGoogleConnection } from "../../contexts/GoogleConnectionProvider";
+import { useGoogleData } from "../../contexts/GoogleDataProvider";
 
 type AgendaItem = {
   time: string;
@@ -11,118 +13,12 @@ type TaskItem = {
   listTitle?: string;
 };
 
-interface GoogleEvent {
-  start?: {
-    dateTime?: string;
-    date?: string;
-  };
-  summary?: string;
-}
-
 export function DailyCalendar() {
-  const [connectedToGoogle, setConnectedToGoogle] = useState<boolean | null>(null);
-  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { setConnectedToGoogle } = useGoogleConnection();
+  const { todayAgenda: agenda, tasks, connected, loading, refresh } = useGoogleData();
 
-  // 🔹 Check authentication + load calendar and tasks
+  // Handle OAuth redirect
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res = await fetch("http://localhost:8080/events", {
-          credentials: "include", // 🔴 REQUIRED to send cookies
-        });
-
-        if (res.status === 401) {
-          setConnectedToGoogle(false);
-          setLoading(false);
-          return;
-        }
-
-        const data = await res.json();
-
-        // Filter for today's events only
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const formattedAgenda: AgendaItem[] = (data.items || [])
-          .map((event: GoogleEvent) => {
-            const eventDate = event.start?.dateTime 
-              ? new Date(event.start.dateTime)
-              : event.start?.date
-              ? new Date(event.start.date)
-              : null;
-
-            return {
-              time: event.start?.dateTime
-                ? new Date(event.start.dateTime).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "All Day",
-              event: event.summary || "Untitled Event",
-              eventDate,
-            };
-          })
-          .filter((item: any) => {
-            // Filter to only today's events
-            if (!item.eventDate) return false;
-            return item.eventDate >= today && item.eventDate < tomorrow;
-          })
-          .map(({ time, event }: { time: string; event: string }) => ({ time, event })); // Remove eventDate from final output
-
-        setAgenda(formattedAgenda);
-        setConnectedToGoogle(true);
-      } catch (err) {
-        console.error("❌ Error fetching events:", err);
-        setConnectedToGoogle(false);
-      } finally {
-        console.log("✅ fetchEvents completed");
-        setLoading(false);
-      }
-    }
-
-    async function fetchTasks() {
-      console.log("📥 fetchTasks called");
-      try {
-        console.log("📡 Fetching from http://localhost:8080/tasks");
-        const res = await fetch("http://localhost:8080/tasks", {
-          credentials: "include",
-        });
-
-        console.log("📡 Tasks response status:", res.status);
-
-        if (res.status === 401) {
-          console.log("❌ Not authenticated for tasks (401)");
-          return; // Already handled by fetchEvents
-        }
-
-        const data = await res.json();
-        
-        console.log("📋 Raw tasks data:", data);
-        console.log("📋 Number of tasks:", data.items?.length || 0);
-        
-        const formattedTasks: TaskItem[] = (data.items || []).map((task: any) => ({
-          title: task.title || "Untitled Task",
-          due: task.due,
-          listTitle: task.listTitle || "My Tasks"
-        }));
-
-        console.log("📋 Formatted tasks:", formattedTasks);
-        setTasks(formattedTasks);
-      } catch (err) {
-        console.error("❌ Error fetching tasks:", err);
-      }
-    }
-
-    console.log("🔄 Starting fetchEvents and fetchTasks");
-    fetchEvents();
-    fetchTasks();
-
-    // 🔹 Handle OAuth redirect
     const urlParams = new URLSearchParams(window.location.search);
     const authSuccess = urlParams.get('auth');
     const authError = urlParams.get('error');
@@ -131,7 +27,7 @@ export function DailyCalendar() {
     if (authSuccess === 'success') {
       console.log('OAuth successful! Refreshing calendar...');
       
-      // Manually set cookie as backup (in case redirect cookie didn't work)
+      // Manually set cookie as backup
       if (userId) {
         document.cookie = `user_id=${userId}; path=/; max-age=${60*60*24*7}; SameSite=Lax`;
         console.log('Set user_id cookie manually:', userId);
@@ -140,18 +36,22 @@ export function DailyCalendar() {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
       
-      // Small delay to ensure cookie is set
+      // Refresh data from context
       setTimeout(() => {
-        fetchEvents();
-        fetchTasks();
+        refresh();
       }, 100);
     } else if (authError) {
       console.error('OAuth failed:', authError);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [refresh]);
 
-  // 🔹 OAuth redirect - FIXED TO USE CORRECT ENDPOINT
+  // Sync the connected state to the old context (if you still need it)
+  useEffect(() => {
+    setConnectedToGoogle(connected);
+  }, [connected, setConnectedToGoogle]);
+
+  // OAuth redirect
   function connectGoogle() {
     window.location.href = "http://localhost:8080/auth/google/login";
   }
@@ -167,13 +67,13 @@ export function DailyCalendar() {
       </h2>
 
       <Reminders 
-        connected={connectedToGoogle} 
+        connected={connected} 
         tasks={tasks}
         connectGoogle={connectGoogle} 
       />
       <br />
       <Calendar
-        connected={connectedToGoogle}
+        connected={connected}
         agenda={agenda}
         connectGoogle={connectGoogle}
       />
@@ -181,13 +81,12 @@ export function DailyCalendar() {
   );
 }
 
-
 function Reminders({
   connected,
   tasks,
   connectGoogle,
 }: {
-  connected: boolean | null;
+  connected: boolean;
   tasks: TaskItem[];
   connectGoogle: () => void;
 }) {
@@ -249,13 +148,12 @@ function Reminders({
   );
 }
 
-
 function Calendar({
   connected,
   agenda,
   connectGoogle,
 }: {
-  connected: boolean | null;
+  connected: boolean;
   agenda: AgendaItem[];
   connectGoogle: () => void;
 }) {
@@ -294,7 +192,7 @@ function Calendar({
   return (
     <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
       <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-        Schedule for Today
+        Schedule for Today ({agenda.length})
       </h3>
       <ul className="space-y-2">
         {agenda.map((item, idx) => (
