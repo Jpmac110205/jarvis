@@ -4,7 +4,10 @@ import { useGoogleData } from "../../contexts/GoogleDataProvider";
 export function CalendarPanel() {
   const { agenda: googleEvents, connected, loading } = useGoogleData();
   const today = useMemo(() => new Date(), []);
-  const [selectedDate, setSelectedDate] = useState<string>(() => today.toISOString().slice(0, 10));
+  const todayKey = useMemo(() => {
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }, [today]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayKey);
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
 
   // Convert Google agenda to events by date format
@@ -37,12 +40,13 @@ export function CalendarPanel() {
 
     const days: { key: string; label: number; isToday: boolean }[] = [];
     for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = new Date(year, month, day);
-      const key = date.toISOString().slice(0, 10);
+      // Use local date string instead of ISO to avoid timezone issues
+      const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       days.push({
         key,
         label: day,
-        isToday: key === today.toISOString().slice(0, 10),
+        isToday: key === todayKey,
       });
     }
 
@@ -76,7 +80,7 @@ export function CalendarPanel() {
 
   function goToToday() {
     setCurrentMonth(new Date());
-    setSelectedDate(today.toISOString().slice(0, 10));
+    setSelectedDate(todayKey);
   }
 
   if (loading) {

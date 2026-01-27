@@ -93,16 +93,17 @@ export function useGoogleData() {
 
 function formatEvents(items: GoogleEvent[]): { allEvents: AgendaItem[]; todayEvents: AgendaItem[] } {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const todayString = today.toISOString().slice(0, 10);
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const allEvents: AgendaItem[] = items.map((event) => {
     const eventDate = event.start?.dateTime 
       ? new Date(event.start.dateTime)
       : event.start?.date
-      ? new Date(event.start.date)
+      ? new Date(event.start.date + 'T00:00:00') // Add time to prevent timezone shift
       : new Date();
+
+    // Use local date instead of ISO to avoid timezone issues
+    const dateKey = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`;
 
     return {
       time: event.start?.dateTime
@@ -112,7 +113,7 @@ function formatEvents(items: GoogleEvent[]): { allEvents: AgendaItem[]; todayEve
           })
         : "All Day",
       event: event.summary || "Untitled Event",
-      date: eventDate.toISOString().slice(0, 10), // Store the date in YYYY-MM-DD format
+      date: dateKey,
     };
   });
 

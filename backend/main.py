@@ -18,17 +18,21 @@ from fastapi.responses import JSONResponse
 
 from dotenv import load_dotenv
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 
 # ==================== SETUP ====================
 # Load .env file from the backend directory
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(backend_dir, '.env'))
+
 app = FastAPI()
 
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,7 +60,17 @@ def create_system_message():
             """.strip()
         )
     )
-    
+dist_dir = os.path.join(os.path.dirname(__file__), "../dist")
+
+app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
+
+@app.get("/")
+def serve_react():
+    index_file = os.path.join(dist_dir, "index.html")
+    if not os.path.exists(index_file):
+        raise HTTPException(status_code=404, detail="React build not found. Run `npm run build`")
+    return FileResponse(index_file)
+
 def get_upcoming_events(access_token):
     """Fetch upcoming Google Calendar events"""
     from datetime import datetime, timezone
