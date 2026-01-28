@@ -148,7 +148,7 @@ function GoogleButton () {
   type="button"
   onClick={() => window.location.href = "https://accounts.google.com/o/oauth2/v2/auth" +
   "?client_id=709562874886-ercnvc3464agumo82b3osvkqriihofgq.apps.googleusercontent.com" +
-  "&redirect_uri=https://undefied-spriggy-germaine.ngrok-free.dev/auth/google/callback" +
+  "&redirect_uri=https://prodigyaiassistant.onrender.com/auth/google/callback" +
   "&response_type=code" +
   "&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ftasks" +
   "&access_type=offline" +

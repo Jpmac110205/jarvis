@@ -67,7 +67,7 @@ export function CalendarPanel() {
   const selectedEvents = eventsByDate[selectedDate] ?? [];
 
   function connectGoogle() {
-    window.location.href = "http://localhost:8080/auth/google/login";
+    window.location.href = "https://prodigyaiassistant.onrender.com/auth/google/login";
   }
 
   function previousMonth() {
