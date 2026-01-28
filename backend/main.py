@@ -347,7 +347,7 @@ async def google_callback(request: Request):
             key="user_id",
             value=user_id,
             httponly=False,  # Changed to False so JS can read it
-            secure=False,
+            secure=True,
             samesite="lax",
             max_age=3600 * 24 * 7,
             domain=None,  # Let browser handle domain
