@@ -62,7 +62,7 @@ def create_system_message():
     )
 dist_dir = os.path.join(os.path.dirname(__file__), "../dist")
 
-app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
+app.mount("/assets", StaticFiles(directory="../dist/assets"), name="assets")
 
 @app.get("/")
 def serve_react():
@@ -502,4 +502,6 @@ async def logout(user_id: Optional[str] = Cookie(None)):
 # ==================== RUN SERVER ====================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080, reload=True)
+    # Read PORT from environment with a sensible default
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=port, log_level="info")
