@@ -60,9 +60,9 @@ def create_system_message():
             """.strip()
         )
     ) 
-dist_dir = os.path.join(os.path.dirname(__file__), "../dist")
-
-app.mount("/assets", StaticFiles(directory="../dist/assets"), name="assets")
+    
+dist_dir = os.path.join(os.path.dirname(__file__), "dist")
+app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
 
 @app.get("/")
 def serve_react():
