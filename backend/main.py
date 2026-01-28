@@ -59,7 +59,7 @@ def create_system_message():
             Be efficient, precise, and dependable. Your role is to assist, recall, organize, and reason—quietly enhancing the user’s effectiveness without unnecessary verbosity.
             """.strip()
         )
-    )
+    ) 
 dist_dir = os.path.join(os.path.dirname(__file__), "../dist")
 
 app.mount("/assets", StaticFiles(directory="../dist/assets"), name="assets")
