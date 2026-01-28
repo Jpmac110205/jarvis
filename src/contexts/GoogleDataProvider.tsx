@@ -42,8 +42,8 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
     setLoading(true);
     try {
       const [eventsRes, tasksRes] = await Promise.all([
-        fetch("http://localhost:8080/events", { credentials: "include" }),
-        fetch("http://localhost:8080/tasks", { credentials: "include" }),
+        fetch("https://prodigyaiassistant.onrender.com/events", { credentials: "include" }),
+        fetch("https://prodigyaiassistant.onrender.com/tasks", { credentials: "include" }),
       ]);
 
       if (eventsRes.status === 401) {
