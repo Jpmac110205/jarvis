@@ -32,7 +32,7 @@ app = FastAPI()
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://prodigyaiassistant.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -224,8 +224,8 @@ async def export_conversation(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== OAUTH CONFIGURATION ====================
-FRONTEND_URL = "http://localhost:5173"
-REDIRECT_URI = "https://undefied-spriggy-germaine.ngrok-free.dev/auth/google/callback"
+FRONTEND_URL = "https://prodigyaiassistant.onrender.com"
+REDIRECT_URI = "https://prodigyaiassistant.onrender.com/auth/google/callback"
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
