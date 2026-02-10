@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import secrets
 
 
 # ==================== SETUP ====================
@@ -32,7 +33,7 @@ app = FastAPI()
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://prodigyaiassistant.onrender.com"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://prodigyaiassistant.onrender.com",],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -224,8 +225,8 @@ async def export_conversation(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== OAUTH CONFIGURATION ====================
-FRONTEND_URL = "https://prodigyaiassistant.onrender.com"
-REDIRECT_URI = "https://prodigyaiassistant.onrender.com/auth/google/callback"
+FRONTEND_URL = os.getenv("FRONTEND_URL")
+REDIRECT_URI = os.getenv("REDIRECT_URI")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
@@ -234,30 +235,31 @@ user_tokens = {}  # key: user_id, value: token_data
 
 @app.get("/auth/google/login")
 async def google_login():
-    """Initiate Google OAuth login"""
-    # Define all scopes we need - use openid for userinfo
     scopes = [
-        "openid",  # Required for userinfo
-        "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/userinfo.profile",
+        "openid",
+        "email",
+        "profile",
         "https://www.googleapis.com/auth/calendar.readonly",
         "https://www.googleapis.com/auth/tasks"
     ]
-    
+
     scope_string = " ".join(scopes)
-    
+
+    state = secrets.token_urlsafe(16)
+
     auth_url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth"
+        "https://accounts.google.com/o/oauth2/v2/auth"
         f"?client_id={CLIENT_ID}"
         f"&redirect_uri={REDIRECT_URI}"
-        f"&response_type=code"
+        "&response_type=code"
         f"&scope={scope_string}"
-        f"&access_type=offline"
-        f"&prompt=consent"
+        f"&state={state}"
+        "&access_type=offline"
+        "&prompt=consent"
     )
-    
-    print(f"Redirecting to OAuth with scopes: {scope_string}")
+
     return RedirectResponse(auth_url)
+
 
 
 @app.get("/auth/google/callback")
@@ -370,19 +372,22 @@ async def google_callback(request: Request):
 
 
 @app.get("/events")
-async def events(user_id: Optional[str] = Cookie(None)):
+async def events(
+    user_id: Optional[str] = Cookie(None),
+    request: Request = None
+):
     """Get user's Google Calendar events"""
     try:
-        # Only log when debugging - initial 401s are expected
-        # print(f"Events endpoint called with user_id: {user_id}")
-        # print(f"Available user tokens: {list(user_tokens.keys())}")
+        # Try to get user_id from cookie first, then from header
+        if not user_id:
+            user_id = request.headers.get("X-User-ID")
         
         if not user_id:
             return JSONResponse(
                 {"error": "not_authenticated", "message": "User not authenticated. Please log in."},
                 status_code=401
             )
-        
+                
         user_data = user_tokens.get(user_id)
         if not user_data:
             return JSONResponse(
@@ -423,7 +428,10 @@ async def events(user_id: Optional[str] = Cookie(None)):
 
 
 @app.get("/tasks")
-async def tasks(user_id: Optional[str] = Cookie(None)):
+async def tasks(
+    user_id: Optional[str] = Cookie(None),
+    request: Request = None
+):
     """Get user's Google Tasks"""
     try:
         if not user_id:
@@ -503,5 +511,5 @@ async def logout(user_id: Optional[str] = Cookie(None)):
 if __name__ == "__main__":
     import uvicorn
     # Read PORT from environment with a sensible default
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run("backend.main:app", host="0.0.0.0", port=port, log_level="info")

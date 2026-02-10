@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Chat from "./components/MiddlePanel/Chat";
 import { TasksPanel } from "./components/MiddlePanel/Tasks";
 import { CalendarPanel } from "./components/MiddlePanel/Calendar";
@@ -9,7 +9,6 @@ import { ShortcutsPanel } from "./components/RightPanel/Shortcuts";
 import { DailyCalendar } from "./components/RightPanel/DailyCalendar";
 import { sendChatMessage } from "./services/api";
 
-
 export interface Message {
   id: number;
   author: "user" | "prodigy";
@@ -18,16 +17,33 @@ export interface Message {
 }
 
 export default function App() {
+  // Handle OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('user_id');
+    const authStatus = params.get('auth');
+    
+    if (userId && authStatus === 'success') {
+      // Store user_id in localStorage
+      localStorage.setItem('user_id', userId);
+      
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      // Optionally reload to fetch data
+      window.location.reload();
+    }
+  }, []);
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
       author: "prodigy",
       content: "Welcome back sir! How may I assist you today?",
-      timestamp:new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     },
   ]);
 
@@ -131,18 +147,13 @@ export default function App() {
   );
 }
 
-
-
 /* ---------------- Right Panel ---------------- */
-
 
 function RightPanel() {
   return (
     <aside className="w-64 bg-neutral-900/40 backdrop-blur-xl border-l border-neutral-800/50 p-4 flex flex-col h-screen shadow-2xl">
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        <DailyCalendar 
-
-        />
+        <DailyCalendar />
       </div>
       <div className="mt-auto border-t border-neutral-800/50 pt-4">
         {ShortcutsPanel()}
@@ -200,6 +211,6 @@ function MiddlePanel({
     case "calendar":
       return <CalendarPanel />;
     default:
-      return <Chat messages={messages} input={input} onChange={onChange} onSend={onSend} />;
+      return <Chat messages={messages} input={input} onChange={onChange} onSend={onSend} isTyping={isTyping} />;
   }
 }

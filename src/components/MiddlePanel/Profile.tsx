@@ -143,17 +143,14 @@ export function ProfilePanel() {
 function GoogleButton () {
   const { connectedToGoogle } = useGoogleConnection();
   if (!connectedToGoogle) {
-    return (<button
-  className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
-  type="button"
-  onClick={() => window.location.href = "https://accounts.google.com/o/oauth2/v2/auth" +
-  "?client_id=709562874886-ercnvc3464agumo82b3osvkqriihofgq.apps.googleusercontent.com" +
-  "&redirect_uri=https://prodigyaiassistant.onrender.com/auth/google/callback" +
-  "&response_type=code" +
-  "&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ftasks" +
-  "&access_type=offline" +
-  "&prompt=consent"}
->
+    return (
+     <button
+        className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
+        type="button"
+        onClick={() => {
+            window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google/login`;
+        }}
+      >
             <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
               <path fill="#EA4335" d="M24 9.5c3.27 0 6.2 1.13 8.52 3.35l6.36-6.36C34.9 2.47 29.86 0 24 0 14.64 0 6.4 5.38 2.52 13.22l7.53 5.85C11.62 13.07 17.27 9.5 24 9.5z" />
               <path fill="#4285F4" d="M46.5 24.5c0-1.57-.14-3.09-.39-4.55H24v9.02h12.7c-.55 2.97-2.2 5.49-4.69 7.18l7.36 5.71C43.78 38.24 46.5 31.88 46.5 24.5z" />

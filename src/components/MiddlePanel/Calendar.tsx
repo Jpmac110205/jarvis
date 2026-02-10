@@ -67,7 +67,9 @@ export function CalendarPanel() {
   const selectedEvents = eventsByDate[selectedDate] ?? [];
 
   function connectGoogle() {
-    window.location.href = "https://prodigyaiassistant.onrender.com/auth/google/login";
+    // Navigate to local dev or production login based on the current hostname
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+    window.location.href = `${BACKEND_URL}/auth/google/login`;
   }
 
   function previousMonth() {

@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 type AgendaItem = {
   time: string;
   event: string;
-  date: string; // Added to track which date each event belongs to
+  date: string;
 };
 
 type TaskItem = {
@@ -14,7 +14,7 @@ type TaskItem = {
 
 type GoogleDataContextType = {
   agenda: AgendaItem[];
-  todayAgenda: AgendaItem[]; // Separate today's events for DailyCalendar
+  todayAgenda: AgendaItem[];
   tasks: TaskItem[];
   connected: boolean;
   loading: boolean;
@@ -41,16 +41,34 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
   async function fetchAll() {
     setLoading(true);
     try {
+      // Get user_id from localStorage
+      const userId = localStorage.getItem('user_id');
+      
+      const headers: HeadersInit = {};
+      
+      // Add user_id header if available
+      if (userId) {
+        headers['X-User-ID'] = userId;
+      }
+
       const [eventsRes, tasksRes] = await Promise.all([
-        fetch("https://prodigyaiassistant.onrender.com/events", { credentials: "include" }),
-        fetch("https://prodigyaiassistant.onrender.com/tasks", { credentials: "include" }),
+        fetch(`${import.meta.env.VITE_BACKEND_URL}/events`, { 
+          credentials: "include",
+          headers 
+        }),
+        fetch(`${import.meta.env.VITE_BACKEND_URL}/tasks`, { 
+          credentials: "include",
+          headers 
+        }),
       ]);
 
-      if (eventsRes.status === 401) {
+      if (eventsRes.status === 401 || tasksRes.status === 401) {
         setConnected(false);
         setAgenda([]);
         setTodayAgenda([]);
         setTasks([]);
+        // Clear stored user_id if unauthorized
+        localStorage.removeItem('user_id');
         return;
       }
 
@@ -99,10 +117,9 @@ function formatEvents(items: GoogleEvent[]): { allEvents: AgendaItem[]; todayEve
     const eventDate = event.start?.dateTime 
       ? new Date(event.start.dateTime)
       : event.start?.date
-      ? new Date(event.start.date + 'T00:00:00') // Add time to prevent timezone shift
+      ? new Date(event.start.date + 'T00:00:00')
       : new Date();
 
-    // Use local date instead of ISO to avoid timezone issues
     const dateKey = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`;
 
     return {
@@ -117,9 +134,7 @@ function formatEvents(items: GoogleEvent[]): { allEvents: AgendaItem[]; todayEve
     };
   });
 
-  // Filter today's events by comparing date strings
   const todayEvents = allEvents.filter((item) => item.date === todayString);
-
   return { allEvents, todayEvents };
 }
 

@@ -37,7 +37,8 @@ export function TasksPanel() {
   const progress = tasks.length ? Math.round(((tasks.length - openCount) / tasks.length) * 100) : 0;
 
   function connectGoogle() {
-    window.location.href = "https://prodigyaiassistant.onrender.com/auth/google/login";
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+    window.location.href = `${BACKEND_URL}/auth/google/login`;
   }
 
   if (loading) {

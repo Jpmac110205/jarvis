@@ -1,6 +1,6 @@
 import type { Message } from "../App";
 
-const API_BASE_URL = "https://prodigyaiassistant.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 export interface ChatResponse {
   reply: string;

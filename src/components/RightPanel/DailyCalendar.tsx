@@ -53,7 +53,7 @@ export function DailyCalendar() {
 
   // OAuth redirect
   function connectGoogle() {
-    window.location.href = "https://prodigyaiassistant.onrender.com/auth/google/login";
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google/login`;
   }
 
   if (loading) {
