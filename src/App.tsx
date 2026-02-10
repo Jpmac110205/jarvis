@@ -53,6 +53,10 @@ export default function App() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
+  // Hidden state for side panels
+  const [leftHidden, setLeftHidden] = useState(false);
+  const [rightHidden, setRightHidden] = useState(false);
+
   async function sendMessage() {
     if (!input.trim()) return;
 
@@ -127,9 +131,28 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen flex bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-neutral-100 overflow-hidden">
-      <LeftPanel middle={middle} onSelect={setMiddle} />
+    <div className="h-screen relative flex bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-neutral-100 overflow-hidden">
+      {/* Left panel + toggle */}
+      <div className="relative flex-shrink-0 h-full">
+        <div
+          className={`h-full overflow-hidden transition-all duration-300 ease-in-out`}
+          style={{ width: leftHidden ? 0 : "16rem" }}
+        >
+          <LeftPanel middle={middle} onSelect={setMiddle} />
+        </div>
 
+        {/* Toggle button for left panel */}
+        <button
+          onClick={() => setLeftHidden((s) => !s)}
+          aria-label={leftHidden ? "Show left panel" : "Hide left panel"}
+            className="absolute top-1/2 -translate-y-1/2 z-30 bg-neutral-800/60 hover:bg-neutral-700 text-neutral-100 w-[14px] h-9 flex items-center justify-center rounded-l-md"
+          style={{ left: leftHidden ? 0 : "16rem" }}
+        >
+          {leftHidden ? "›" : "‹"}
+        </button>
+      </div>
+
+      {/* Main area */}
       <main className="flex-1 flex flex-col items-center overflow-hidden">
         <MiddleHeader middle={middle} />
         <MiddlePanel
@@ -142,7 +165,25 @@ export default function App() {
         />
       </main>
 
-      <RightPanel/>
+      {/* Right panel + toggle */}
+      <div className="relative flex-shrink-0 h-full">
+        <div
+          className={`h-full overflow-hidden transition-all duration-300 ease-in-out`}
+          style={{ width: rightHidden ? 0 : "16rem" }}
+        >
+          <RightPanel />
+        </div>
+
+        {/* Toggle button for right panel */}
+        <button
+          onClick={() => setRightHidden((s) => !s)}
+          aria-label={rightHidden ? "Show right panel" : "Hide right panel"}
+            className="absolute top-1/2 -translate-y-1/2 z-30 bg-neutral-800/60 hover:bg-neutral-700 text-neutral-100 w-[14px] h-9 flex items-center justify-center rounded-r-md"
+          style={{ right: rightHidden ? 0 : "16rem" }}
+        >
+          {rightHidden ? "‹" : "›"}
+        </button>
+      </div>
     </div>
   );
 }
