@@ -15,38 +15,9 @@ type TaskItem = {
 
 export function DailyCalendar() {
   const { setConnectedToGoogle } = useGoogleConnection();
-  const { todayAgenda: agenda, tasks, connected, loading, refresh } = useGoogleData();
+  const { todayAgenda: agenda, tasks, connected, loading } = useGoogleData();
 
-  // Handle OAuth redirect
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const authSuccess = urlParams.get('auth');
-    const authError = urlParams.get('error');
-    const userId = urlParams.get('user_id');
-    
-    if (authSuccess === 'success') {
-      console.log('OAuth successful! Refreshing calendar...');
-      
-      // Manually set cookie as backup
-      if (userId) {
-        document.cookie = `user_id=${userId}; path=/; max-age=${60*60*24*7}; SameSite=Lax`;
-        console.log('Set user_id cookie manually:', userId);
-      }
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Refresh data from context
-      setTimeout(() => {
-        refresh();
-      }, 100);
-    } else if (authError) {
-      console.error('OAuth failed:', authError);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [refresh]);
-
-  // Sync the connected state to the old context (if you still need it)
+  // Sync the connected state to the old context
   useEffect(() => {
     setConnectedToGoogle(connected);
   }, [connected, setConnectedToGoogle]);

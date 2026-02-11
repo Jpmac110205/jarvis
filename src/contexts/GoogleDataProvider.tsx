@@ -37,6 +37,7 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
 
   async function fetchAll() {
     setLoading(true);
@@ -49,6 +50,9 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
       // Add user_id header if available
       if (userId) {
         headers['X-User-ID'] = userId;
+        console.log('Fetching with user_id:', userId);
+      } else {
+        console.log('No user_id in localStorage yet');
       }
 
       const [eventsRes, tasksRes] = await Promise.all([
@@ -62,7 +66,11 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
         }),
       ]);
 
+      console.log('Events response status:', eventsRes.status);
+      console.log('Tasks response status:', tasksRes.status);
+
       if (eventsRes.status === 401 || tasksRes.status === 401) {
+        console.log('Got 401. Events 401?', eventsRes.status === 401, 'Tasks 401?', tasksRes.status === 401);
         setConnected(false);
         setAgenda([]);
         setTodayAgenda([]);
@@ -75,11 +83,15 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
       const eventsData = await eventsRes.json();
       const tasksData = await tasksRes.json();
 
+      console.log('Events data:', eventsData);
+      console.log('Tasks data:', tasksData);
+
       const { allEvents, todayEvents } = formatEvents(eventsData.items || []);
       setAgenda(allEvents);
       setTodayAgenda(todayEvents);
       setTasks(formatTasks(tasksData.items || []));
       setConnected(true);
+      console.log('✅ Google data loaded successfully');
     } catch (err) {
       console.error("❌ Google data fetch failed:", err);
       setConnected(false);
@@ -91,6 +103,26 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     fetchAll();
   }, []);
+
+  // Watch for user_id changes in localStorage
+  useEffect(() => {
+    const userId = localStorage.getItem('user_id');
+    
+    // If user_id changed, re-fetch
+    if (userId && userId !== trackedUserId) {
+      console.log('User_id detected in localStorage, fetching Google data:', userId);
+      setTrackedUserId(userId);
+      fetchAll();
+    } else if (!userId && trackedUserId) {
+      // User logged out
+      console.log('User logged out');
+      setTrackedUserId(null);
+      setConnected(false);
+      setAgenda([]);
+      setTodayAgenda([]);
+      setTasks([]);
+    }
+  }, [trackedUserId]);
 
   return (
     <GoogleDataContext.Provider

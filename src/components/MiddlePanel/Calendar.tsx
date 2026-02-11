@@ -137,7 +137,7 @@ export function CalendarPanel() {
               onClick={goToToday}
               className="px-3 py-1 text-xs rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 transition-colors text-neutral-300"
             >
-              Today
+              Month
             </button>
             <button
               onClick={nextMonth}

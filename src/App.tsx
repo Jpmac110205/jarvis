@@ -17,7 +17,7 @@ export interface Message {
 }
 
 export default function App() {
-  // Handle OAuth callback
+  // Handle OAuth callback - store user_id but don't reload
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const userId = params.get('user_id');
@@ -27,11 +27,8 @@ export default function App() {
       // Store user_id in localStorage
       localStorage.setItem('user_id', userId);
       
-      // Clean up URL
+      // Clean up URL without reloading
       window.history.replaceState({}, '', window.location.pathname);
-      
-      // Optionally reload to fetch data
-      window.location.reload();
     }
   }, []);
 
@@ -145,7 +142,7 @@ export default function App() {
         <button
           onClick={() => setLeftHidden((s) => !s)}
           aria-label={leftHidden ? "Show left panel" : "Hide left panel"}
-            className="absolute top-1/2 -translate-y-1/2 z-30 bg-neutral-800/60 hover:bg-neutral-700 text-neutral-100 w-[14px] h-9 flex items-center justify-center rounded-l-md"
+            className="absolute top-1/2 -translate-y-1/2 z-30 bg-neutral-800/60 hover:bg-neutral-700 text-neutral-100 w-[14px] h-9 flex items-center justify-center rounded-r-md"
           style={{ left: leftHidden ? 0 : "16rem" }}
         >
           {leftHidden ? "›" : "‹"}
@@ -178,7 +175,7 @@ export default function App() {
         <button
           onClick={() => setRightHidden((s) => !s)}
           aria-label={rightHidden ? "Show right panel" : "Hide right panel"}
-            className="absolute top-1/2 -translate-y-1/2 z-30 bg-neutral-800/60 hover:bg-neutral-700 text-neutral-100 w-[14px] h-9 flex items-center justify-center rounded-r-md"
+            className="absolute top-1/2 -translate-y-1/2 z-30 bg-neutral-800/60 hover:bg-neutral-700 text-neutral-100 w-[14px] h-9 flex items-center justify-center rounded-l-md"
           style={{ right: rightHidden ? 0 : "16rem" }}
         >
           {rightHidden ? "‹" : "›"}

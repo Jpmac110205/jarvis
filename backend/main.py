@@ -27,6 +27,7 @@ import secrets
 # Load .env file from the backend directory
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(backend_dir, '.env'))
+print("OPENAI_API_KEY loaded:", bool(os.getenv("OPENAI_API_KEY")))
 
 app = FastAPI()
 
@@ -45,22 +46,25 @@ current_results = {
 }
 
 def create_system_message():
-    """Generate a dynamic system message based on prediction results"""
     return SystemMessage(
         content=(
             """
-            You are Prodigy, a personal AI assistant powered by retrieval-augmented generation (RAG). You act as a persistent extension of the user’s memory, reasoning, and productivity.
-            You have access to the user’s personal documents (course notes, papers, project documentation), full conversational history, task list, calendar, and web search when required.
-            Use personal documents as the primary source of truth. When referencing them, always cite explicitly using natural language attribution (e.g., “According to your course notes…”). Cite each source individually when synthesizing multiple documents. Never fabricate, infer, or embellish details about personal documents.
-            If relevant context is missing or retrieval quality is insufficient, state clearly that you do not have enough relevant information. If sources conflict, acknowledge the discrepancy explicitly. If information is unavailable, offer to search the web or wait for additional document uploads.
-            Maintain continuity across sessions by referencing prior conversations naturally when relevant. Treat historical context as ongoing memory, not isolated exchanges.
-            Automatically detect when a query requires current or real-time information (e.g., news, weather, current events) and route those requests to web search. For hybrid queries, combine personal knowledge and web results with clear attribution for each source.
-            For task management, confirm all actions before or immediately after execution. Present tasks clearly and acknowledge completions. For calendar interactions, present information chronologically, concisely, and without ambiguity.
-            Maintain a professional, composed, and warm demeanor with restrained, intelligent humor when appropriate. Accuracy and clarity always take precedence over personality, especially when information is uncertain or high-stakes.
-            Be efficient, precise, and dependable. Your role is to assist, recall, organize, and reason—quietly enhancing the user’s effectiveness without unnecessary verbosity.
-            """.strip()
-        )
-    ) 
+            You are Prodigy, a personal AI assistant designed to help the user reason, recall information, and stay productive.
+
+            When personal documents or prior conversation context are provided, treat them as the primary source of truth.
+            If relevant context is missing or insufficient, state this clearly and do not fabricate information.
+
+            When answering:
+            - Prefer accuracy and clarity over verbosity.
+            - Cite provided sources explicitly when using them (e.g., “According to your course notes…”).
+            - If sources conflict, acknowledge the uncertainty.
+            - If a question cannot be answered with the available context, say so.
+
+            Maintain a professional, calm, and helpful tone with light, restrained humor when appropriate.
+            Be concise by default, and expand only when deeper explanation is clearly useful.
+            """
+        ).strip()
+    )
     
 dist_dir = os.path.join(os.path.dirname(__file__), "dist")
 app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
@@ -349,7 +353,7 @@ async def google_callback(request: Request):
             key="user_id",
             value=user_id,
             httponly=False,  # Changed to False so JS can read it
-            secure=True,
+            secure=False,  # Allow localhost HTTP during development
             samesite="lax",
             max_age=3600 * 24 * 7,
             domain=None,  # Let browser handle domain
@@ -382,7 +386,10 @@ async def events(
         if not user_id:
             user_id = request.headers.get("X-User-ID")
         
+        print(f"[/events] Attempting to fetch for user_id: {user_id}")
+        
         if not user_id:
+            print(f"[/events] No user_id found in cookie or header")
             return JSONResponse(
                 {"error": "not_authenticated", "message": "User not authenticated. Please log in."},
                 status_code=401
@@ -434,6 +441,10 @@ async def tasks(
 ):
     """Get user's Google Tasks"""
     try:
+        # Try to get user_id from cookie first, then from header
+        if not user_id:
+            user_id = request.headers.get("X-User-ID")
+        
         if not user_id:
             return JSONResponse(
                 {"error": "not_authenticated", "message": "User not authenticated. Please log in."},
