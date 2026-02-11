@@ -24,11 +24,11 @@ export function ProfilePanel() {
       {/* Top summary */}
       <section className="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-5 shadow-lg backdrop-blur flex gap-4 items-center">
         <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 grid place-items-center text-xl font-bold text-white shadow-lg shadow-blue-500/30">
-          JM
+          JD
         </div>
         <div className="flex-1">
           <p className="text-sm text-neutral-400">Workspace member</p>
-          <p className="text-lg font-semibold text-neutral-50">James McAllister</p>
+          <p className="text-lg font-semibold text-neutral-50">John Doe</p>
           <p className="text-xs text-neutral-400">Joined NULL</p>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
@@ -59,7 +59,7 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Display name</label>
               <input
                 type="text"
-                defaultValue="Jimmy"
+                placeholder="Name"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
             </div>
@@ -67,7 +67,7 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Title</label>
               <input
                 type="text"
-                defaultValue="AI Engineer Intern"
+                placeholder="Role @ Example"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
             </div>
@@ -75,7 +75,7 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Location</label>
               <input
                 type="text"
-                defaultValue="Feasterville, PA"
+                placeholder="Location"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
             </div>
@@ -92,7 +92,7 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Email</label>
               <input
                 type="email"
-                defaultValue="jpmac1102@outlook.com"
+                placeholder="example@example.com"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
             </div>
@@ -133,7 +133,7 @@ export function ProfilePanel() {
           <span className="text-[11px] text-neutral-400">AI Behavior</span>
         </div>
         <textarea
-          placeholder="E.g., You are an expert in software engineering and you like helping with homework and being a friendly companion."
+          placeholder="E.g., You are an AI chatbot with ____ personality, specializing in _____ and _____."
           className="w-full h-32 bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500 resize-none font-mono text-sm"
         />
       </section>
