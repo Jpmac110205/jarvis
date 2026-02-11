@@ -349,18 +349,22 @@ async def google_callback(request: Request):
         # Redirect to frontend with success and user_id in URL
         # This helps with cookie issues when using ngrok
         response = RedirectResponse(f"{FRONTEND_URL}?auth=success&user_id={user_id}")
+        
+        # Determine if we're in production (HTTPS) or development (HTTP)
+        is_secure = FRONTEND_URL.startswith("https://")
+        
         response.set_cookie(
             key="user_id",
             value=user_id,
-            httponly=False,  # Changed to False so JS can read it
-            secure=False,  # Allow localhost HTTP during development
+            httponly=False,  # Allow JS to read it
+            secure=is_secure,  # True for HTTPS (production), False for HTTP (localhost)
             samesite="lax",
             max_age=3600 * 24 * 7,
             domain=None,  # Let browser handle domain
             path="/"
         )
         
-        print(f"Setting cookie for user_id: {user_id}")
+        print(f"Setting cookie for user_id: {user_id} (secure={is_secure})")
         return response
     
     except requests.exceptions.RequestException as e:
