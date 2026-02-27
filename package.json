@@ -7,10 +7,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev": "concurrently \"npm:dev:db\" \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:db": "brew services start postgresql@14 && echo 'PostgreSQL started.'",
     "dev:frontend": "vite",
     "dev:backend": "cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
-  },
+},
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "react": "^19.2.0",

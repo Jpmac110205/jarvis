@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 
-from fastapi.params import Form
+from fastapi.params import Depends, Form
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
@@ -21,6 +21,9 @@ from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import secrets
+
+import psycopg
+
 
 
 # ==================== SETUP ====================
@@ -516,6 +519,26 @@ async def logout(user_id: Optional[str] = Cookie(None)):
     response = JSONResponse({"status": "logged out"})
     response.delete_cookie("user_id")
     return response
+
+# Dependency to get a DB connection
+def get_db():
+    conn = psycopg.connect(dbname="prodigy", user="jpmac1102", host="localhost")
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+@app.get("/users/{user_id}")
+def get_user(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, email, display_name, given_name, family_name, title, location, picture_url, verified FROM users WHERE id=%s", (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Map row to dict
+    columns = ["id","username","email","display_name","given_name","family_name","title","location","picture_url","verified"]
+    return dict(zip(columns, user))
 
 
 # ==================== RUN SERVER ====================
