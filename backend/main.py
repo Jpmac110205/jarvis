@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 
-from fastapi.params import Depends, Form
+from fastapi.params import Body, Depends, Form
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
@@ -151,7 +151,7 @@ def get_tasks(access_token):
 # Initialize ChatOpenAI model
 model = ChatOpenAI(
     temperature=0.7, 
-    model="gpt-4o-mini",
+    model="gpt-4.1-mini",
     openai_api_key=os.getenv("OPENAI_API_KEY"),
 )
 
@@ -540,6 +540,38 @@ def get_user(user_id: int, conn=Depends(get_db)):
     columns = ["id","username","email","display_name","given_name","family_name","title","location","picture_url","verified"]
     return dict(zip(columns, user))
 
+@app.put("/users/{user_id}")
+def update_user(user_id: int, data: dict = Body(...), conn=Depends(get_db)):
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE users
+        SET display_name=%s,
+            given_name=%s,
+            family_name=%s,
+            title=%s,
+            location=%s,
+            updated_at=CURRENT_TIMESTAMP
+        WHERE id=%s
+        RETURNING id, username, email, display_name, given_name, family_name, title, location, picture_url, verified
+    """, (
+        data["display_name"],
+        data["given_name"],
+        data["family_name"],
+        data.get("title"),
+        data.get("location"),
+        user_id
+    ))
+
+    updated = cur.fetchone()
+    conn.commit()
+    cur.close()
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    columns = ["id","username","email","display_name","given_name","family_name","title","location","picture_url","verified"]
+    return dict(zip(columns, updated))
 
 # ==================== RUN SERVER ====================
 if __name__ == "__main__":

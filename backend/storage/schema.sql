@@ -1,8 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
+    google_id VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
     display_name VARCHAR(255) NOT NULL,
     given_name VARCHAR(255) NOT NULL,
     family_name VARCHAR(255) NOT NULL,

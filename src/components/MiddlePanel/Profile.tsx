@@ -1,8 +1,19 @@
 import { DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { useState as reactUseState } from 'react';
 import { useGoogleConnection } from "../../contexts/GoogleConnectionProvider";
+import { useState, useEffect } from "react";
+
 
 export function ProfilePanel() {
+
+  const [user, setUser] = useState<any>(null);
+  const userId = 1; // replace with auth-based user later
+   useEffect(() => {
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/users/${userId}`)
+      .then(res => res.json())
+      .then(data => setUser(data));
+  }, []);
+  
   return (
     <div className="w-full max-w-3xl px-6 py-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin">
       {/* Header */}
@@ -28,7 +39,7 @@ export function ProfilePanel() {
         </div>
         <div className="flex-1">
           <p className="text-sm text-neutral-400">Workspace member</p>
-          <p className="text-lg font-semibold text-neutral-50">John Doe</p>
+          <p className="text-lg font-semibold text-neutral-50">{user?.display_name || "Unknown"}</p>
           <p className="text-xs text-neutral-400">Joined NULL</p>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
