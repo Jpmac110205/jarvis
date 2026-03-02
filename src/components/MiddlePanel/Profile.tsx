@@ -144,6 +144,7 @@ export function ProfilePanel() {
           className="w-full h-32 bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500 resize-none font-mono text-sm"
         />
         </div>
+        <ResetDataButton />
       </section>
     </div>
   );
@@ -193,9 +194,6 @@ function AppleButton() {
             className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
             type="button"
           >
-            <svg aria-hidden="true" className="w-5 h-5 self-center transform -translate-y-1" viewBox="0 0 24 24" fill="currentColor" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16.365 1.43c0 1.04-.4 2.02-1.13 2.75-.78.78-1.85 1.37-3.16 1.37-.06 0-.12 0-.18-.01.05-.43.09-.86.09-1.28C12.02 2.7 13.95.5 16.36.5v.93zM12.5 6.75c1.97 0 3.4 1.03 4.2 1.03.57 0 2.03-.92 3.43-.92.22 0 .33 0 .48.02-1.13 1.7-1.7 3.68-1.7 5.79 0 4.29 2.68 6.69 2.72 6.72-.03.09-.62 2.32-1.9 4.05C17.58 24.03 16 24.5 14.96 24.5c-1.04 0-1.89-.42-2.77-.42-.88 0-1.7.43-2.78.43-1.09 0-2.6-.47-3.94-2.08-1.49-1.79-2.41-4.66-2.41-7.49 0-3.2 1.62-4.92 3.66-4.92.88 0 1.78.66 2.72.66.86 0 1.77-.68 2.97-.68 1.21 0 2.3.69 3.28.69z"/>
-            </svg>
             <span>Connect Apple ID</span>
           </button>
     );
@@ -216,4 +214,23 @@ function AppleButton() {
     )
   }
 }
+function ResetDataButton() {
 
+  async function handleReset() {
+    const confirmed = window.confirm(
+      "WARNING: Are you sure you want to delete your chat history? This will remove chat history, personality as well as stored PDF documents. This is irreversible."
+    );
+    if (!confirmed) return;
+
+  }
+
+  return (
+    <button
+      className="w-full py-3 px-4 rounded-xl border border-red-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-red-500 font-semibold transition-all duration-200 shadow-sm hover:shadow-red-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-neutral-900"
+      type="button"
+      onClick={handleReset}
+    >
+      <span>Reset All Data</span>
+    </button>
+  );
+}
