@@ -66,6 +66,14 @@ export function CalendarPanel() {
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
 
+  // Create a Date object from the selectedDate string (YYYY-MM-DD)
+  // using local date components to avoid timezone shifts when parsing.
+  const selectedDateObj = useMemo(() => {
+    const parts = selectedDate.split("-").map((p) => Number(p));
+    const [year, month, day] = parts;
+    return new Date(year, month - 1, day);
+  }, [selectedDate]);
+
   function connectGoogle() {
     // Navigate to local dev or production login based on the current hostname
     const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -104,7 +112,7 @@ export function CalendarPanel() {
         </div>
         <button
           onClick={connectGoogle}
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-105 active:scale-95"
+          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-600 hover:to-blue-400 text-white font-medium shadow-lg shadow-blue-600/25 transition-all duration-200 hover:scale-105 active:scale-95"
         >
           Connect Google
         </button>
@@ -158,7 +166,7 @@ export function CalendarPanel() {
           <span>Normal</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-blue-500" />
+          <span className="w-3 h-3 rounded-full bg-blue-600" />
           <span>Today</span>
         </div>
         <div className="flex items-center gap-2">
@@ -196,7 +204,7 @@ export function CalendarPanel() {
                   key={day.key}
                   onClick={() => setSelectedDate(day.key)}
                   className={`h-12 sm:h-16 w-full rounded-xl border text-xs sm:text-sm flex flex-col items-start justify-between p-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg
-                  ${day.isToday ? "border-blue-500/60 bg-blue-500/15 text-blue-50" : "border-neutral-800/60 bg-neutral-800/40 text-neutral-100"}
+                  ${day.isToday ? "border-blue-600/60 bg-blue-600/15 text-blue-50" : "border-neutral-800/60 bg-neutral-800/40 text-neutral-100"}
                   ${isSelected ? "ring-2 ring-blue-400/60" : ""}
                   `}
                 >
@@ -221,7 +229,7 @@ export function CalendarPanel() {
           <div>
             <p className="text-sm text-neutral-400">Agenda</p>
             <p className="text-lg font-semibold text-neutral-50">
-              {new Date(selectedDate).toLocaleDateString(undefined, {
+              {selectedDateObj.toLocaleDateString(undefined, {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
@@ -250,7 +258,7 @@ export function CalendarPanel() {
                     <p className="text-xs text-neutral-400">{e.location}</p>
                   )}
                 </div>
-                <span className="text-xs sm:text-sm font-mono text-blue-100 bg-blue-500/15 px-2 py-1 rounded-md border border-blue-500/30">
+                <span className="text-xs sm:text-sm font-mono text-blue-100 bg-blue-600/15 px-2 py-1 rounded-md border border-blue-600/30">
                   {e.time}
                 </span>
               </div>

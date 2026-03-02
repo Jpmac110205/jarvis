@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
     location VARCHAR(255),
     system_prompt TEXT,
     picture_url TEXT,
+    tasks_number INTEGER DEFAULT 0,
+    chats_number INTEGER DEFAULT 0,
+    pdfs_number INTEGER DEFAULT 0,
     verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
