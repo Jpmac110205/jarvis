@@ -27,3 +27,5 @@ venv/lib/python3.9/site-packages/onnxruntime/capi/onnxruntime_pybind11_state.so
 .env
 app.db
 *backend/.tokens.json
+backend/dist/
+
