@@ -59,7 +59,7 @@ export function ProfilePanel() {
           </div>
         </div>
       </section>
-
+ 
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
         <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
           <div className="flex items-center justify-between">
