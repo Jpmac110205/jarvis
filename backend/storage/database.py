@@ -1,13 +1,28 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
-DATABASE_URL = "sqlite:///./app.db"
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+def get_connection():
+    """
+    Creates and returns a connection to the PostgreSQL database
+    """
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    conn = psycopg2.connect(
+        host="localhost",
+        port=5432,
+        database="your_database_name",
+        user="your_username",
+        password="your_password"
+    )
 
-Base = declarative_base()
+    return conn
+
+
+def get_cursor():
+    """
+    Returns a cursor that outputs dictionaries instead of tuples
+    """
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    return conn, cursor
