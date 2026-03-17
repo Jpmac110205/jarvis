@@ -18,10 +18,12 @@ export async function sendChatMessage(
   history: Message[]
 ): Promise<ChatResponse> {
   try {
+    const userId = localStorage.getItem('user_id');
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(userId ? { 'X-User-ID': userId } : {})
       },
       body: JSON.stringify({
         message,

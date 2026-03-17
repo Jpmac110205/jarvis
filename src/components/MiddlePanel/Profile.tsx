@@ -5,14 +5,73 @@ import { useState, useEffect } from "react";
 
 export function ProfilePanel() {
 
-  const [user, setUser] = useState<any>(null);
-  const userId = 1; // replace with auth-based user later
-   useEffect(() => {
-    fetch(`${import.meta.env.VITE_BACKEND_URL}/users/${userId}`)
-      .then(res => res.json())
-      .then(data => setUser(data));
-  }, []);
+  // With this — add a separate editable form state:
+const [user, setUser] = useState<any>(null);
+  const [form, setForm] = useState({ name: "", email: "", title: "", location: ""});
+  const [nameEmailLocked, setNameEmailLocked] = useState(false);
+
+useEffect(() => {
+  const userId = localStorage.getItem('user_id');
+  fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/status`, {
+    credentials: 'include',
+    headers: userId ? { 'X-User-ID': userId } : {}
+  })
+    .then(res => res.json())
+    .then(data => {
+  if (data.authenticated) {
+    setUser(data.user);
+    setForm({
+      name: data.user.name || "",
+      email: data.user.email || "",
+      title: data.user.title || "",
+      location: data.user.location || "",
+    });
+    // Lock name/email if both are present in DB
+    if (data.user.name && data.user.email) {
+      setNameEmailLocked(true);
+    } else {
+      setNameEmailLocked(false);
+    }
+  }
+});
+}, []);
+
   const [selectedModel, setSelectedModel] = useState<string>("gpt-5-mini");
+  const [saveStatus, setSaveStatus] = useState<null | "success" | "error" | "saving">(null);
+
+  const handleSaveChanges = async () => {
+    if (!user?.id) return;
+    setSaveStatus("saving");
+    const userId = localStorage.getItem('user_id');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(userId ? { 'X-User-ID': userId } : {})
+        },
+        body: JSON.stringify(form)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+        setForm({
+          name: data.display_name || "",
+          email: data.email || "",
+          title: data.title || "",
+          location: data.location || "",
+        });
+        setSaveStatus("success");
+        setTimeout(() => setSaveStatus(null), 2000);
+      } else {
+        setSaveStatus("error");
+        setTimeout(() => setSaveStatus(null), 2000);
+      }
+    } catch (e) {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus(null), 2000);
+    }
+  };
 
   const modelInfo: Record<string, { label: string; cost: string; performance: string }> = {
     "gpt-5-mini": { label: "GPT-5 mini", cost: "$0.003", performance: "Balanced: good quality with moderate latency." },
@@ -29,10 +88,33 @@ export function ProfilePanel() {
           <h2 className="text-xl font-semibold text-neutral-100">Profile</h2>
           <p className="text-sm text-neutral-400">Manage your account info, identity, and connections.</p>
         </div>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-blue-600 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95">
-            Save Changes
+        <div className="flex gap-2 items-center">
+          <button
+            className={
+              `px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 ` +
+              (saveStatus === "success"
+                ? "bg-green-600 text-white"
+                : saveStatus === "error"
+                ? "bg-red-600 text-white"
+                : "bg-blue-600 hover:from-blue-500 hover:to-blue-400 text-white")
+            }
+            onClick={handleSaveChanges}
+            disabled={saveStatus === "saving"}
+          >
+            {saveStatus === "saving"
+              ? "Saving..."
+              : saveStatus === "success"
+              ? "Saved!"
+              : saveStatus === "error"
+              ? "Error"
+              : "Save Changes"}
           </button>
+          {saveStatus === "success" && (
+            <span className="ml-2 text-green-400 text-sm">✓ Changes saved</span>
+          )}
+          {saveStatus === "error" && (
+            <span className="ml-2 text-red-400 text-sm">Failed to save</span>
+          )}
         </div>
       </div>
 
@@ -41,8 +123,8 @@ export function ProfilePanel() {
 
         <div className="flex-1">
           <p className="text-sm text-neutral-400">Prodigy partner</p>
-          <p className="text-lg font-semibold text-neutral-50">{user?.display_name || "Unknown"}</p>
-          <p className="text-xs text-neutral-400">Joined NULL</p>
+          <p className="text-lg font-semibold text-neutral-50">{form.name}</p>
+          <p className="text-xs text-neutral-400">Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "Unknown"}</p>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
           <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
@@ -68,25 +150,33 @@ export function ProfilePanel() {
           </div>
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Display name</label>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Name</label>
               <input
                 type="text"
+                value={form.name}
+                onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Name"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+                disabled={nameEmailLocked}
               />
             </div>
             <div>
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Email</label>
               <input
                 type="email"
+                value={form.email}
+                onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="example@example.com"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+                disabled={nameEmailLocked}
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Title</label>
+              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Role</label>
               <input
                 type="text"
+                value={form.title}
+                onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
                 placeholder="Role @ Example"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
@@ -95,6 +185,8 @@ export function ProfilePanel() {
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Location</label>
               <input
                 type="text"
+                value={form.location}
+                onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
                 placeholder="Location"
                 className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
               />
@@ -140,6 +232,7 @@ export function ProfilePanel() {
         <div>
               <label className="text-xs font-semibold text-neutral-300 mb-1 block">Custom System Prompt</label>
         <textarea
+          value={user?.system_prompt || ""}
           placeholder="E.g., You are an AI chatbot with ____ personality, specializing in _____ and _____."
           className="w-full h-32 bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500 resize-none font-mono text-sm"
         />

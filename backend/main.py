@@ -1,3 +1,5 @@
+import profile
+
 from fastapi import FastAPI, File, UploadFile, Request, HTTPException, Cookie
 from fastapi.middleware.cors import CORSMiddleware 
 from io import BytesIO
@@ -8,6 +10,7 @@ from dotenv import load_dotenv
 from typing import Optional
 
 from fastapi.params import Body, Depends, Form
+from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
@@ -22,7 +25,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import secrets
 
-import psycopg
+
+from storage import user_repository
 
 
 
@@ -40,7 +44,8 @@ app.add_middleware(
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://prodigyaiassistant.onrender.com",],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization", "X-User-ID"],
+
 )
 
 # ==================== GLOBAL STATE ====================
@@ -48,18 +53,37 @@ current_results = {
     "chat_history": [],  # Will store conversation history
 }
 
-def create_system_message():
+
+#Create a user class to be able to store initial keys for the database
+class UserCreate(BaseModel):
+    email: str
+    display_name: str
+    given_name: str
+    family_name: str
+    picture_url: Optional[str] = None
+    
+    
+
+def create_system_message(user_data: dict = None):
+    name = user_data.get("name", "") if user_data else ""
+    title = user_data.get("title", "") if user_data else ""
+    location = user_data.get("location", "") if user_data else ""
+
+    user_line = ""
+    if name or title or location:
+        user_line = f"\nYour user's name is {name}, they work as a {title} based in {location}."
+
     return SystemMessage(
         content=(
-            """
+            f"""
             You are Prodigy, a personal AI assistant designed to help the user reason, recall information, and stay productive.
-
+            {user_line}
             When personal documents or prior conversation context are provided, treat them as the primary source of truth.
             If relevant context is missing or insufficient, state this clearly and do not fabricate information.
 
             When answering:
             - Prefer accuracy and clarity over verbosity.
-            - Cite provided sources explicitly when using them (e.g., “According to your course notes…”).
+            - Cite provided sources explicitly when using them (e.g., "According to your course notes…").
             - If sources conflict, acknowledge the uncertainty.
             - If a question cannot be answered with the available context, say so.
 
@@ -166,16 +190,36 @@ async def chat(request: Request):
         data = await request.json()
         user_message = data.get("message", "").strip()
         
-        if not user_message:
-            return {
-                "reply": "Please enter a message.",
-                "error": None
-            }
+        # Get user_id from header or cookie
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            user_id = request.cookies.get("user_id")
+
+        print(f"[/chat] user_id from request: {user_id}")
+
+        # Look up user profile for system prompt context
+        user_profile = None
+        if user_id:
+            db_user = user_repository.get_user_by_google_id(user_id)
+            print(f"[/chat] db_user fetched: {db_user}")
+            if db_user:
+                user_profile = {
+                    "name": db_user.get("display_name"),
+                    "title": db_user.get("title"),
+                    "location": db_user.get("location"),
+                }
+                print(f"[/chat] user_profile built: {user_profile}")
+        else:
+            print(f"[/chat] No user_id found — system prompt will have no user context")
+
+        system_msg = create_system_message(user_profile)
+        print(f"[/chat] system message content: {system_msg.content}")
         
         # Build messages for the model - include system message first
-        messages = [create_system_message()] + current_results["chat_history"] + [HumanMessage(content=user_message)]
+        messages = [create_system_message(user_profile)] + current_results["chat_history"] + [HumanMessage(content=user_message)]
         
         # Get response from model
+        print(f"[/chat] full messages sent to model: {[m.content for m in messages]}")
         response = model.invoke(messages)
         response_text = response.content
         
@@ -494,20 +538,38 @@ async def tasks(
 
 
 @app.get("/auth/status")
-async def auth_status(user_id: Optional[str] = Cookie(None)):
-    """Check if user is authenticated"""
+async def auth_status(
+    request: Request,
+    user_id: Optional[str] = Cookie(None)
+):
+    if not user_id:
+        user_id = request.headers.get("X-User-ID")
+    
     if not user_id or user_id not in user_tokens:
         return {"authenticated": False}
     
     user_data = user_tokens[user_id]
+    profile = user_data["profile"]
+
+    # 🔥 Check if user exists in DB
+    existing_user = user_repository.get_user_by_google_id(user_id)
+
+    if not existing_user:
+        user_repository.create_user(...)
+        existing_user = user_repository.get_user_by_google_id(user_id)
+
     return {
-        "authenticated": True,
-        "user": {
-            "email": user_data["profile"].get("email"),
-            "name": user_data["profile"].get("name"),
-            "picture": user_data["profile"].get("picture")
-        }
+    "authenticated": True,
+    "user": {
+        "id": existing_user["id"],
+        "email": profile.get("email"),
+        "name": existing_user.get("display_name") or profile.get("name"),
+        "picture": profile.get("picture"),
+        "title": existing_user.get("title"),
+        "location": existing_user.get("location"),
+        "created_at": existing_user["created_at"].isoformat() if existing_user and existing_user.get("created_at") else None
     }
+}
 
 
 @app.post("/auth/logout")
@@ -520,59 +582,43 @@ async def logout(user_id: Optional[str] = Cookie(None)):
     response.delete_cookie("user_id")
     return response
 
-# Dependency to get a DB connection
-def get_db():
-    conn = psycopg.connect(dbname="prodigy", user="jpmac1102", host="localhost")
-    try:
-        yield conn
-    finally:
-        conn.close()
 
+    
+#Post endpoint to create a user in the database
+@app.post("/users")
+def create_user(user: UserCreate):
+    user_repository.create_user(user)
+    return {"message": "User created"}
+
+#Get users endpoint to retrieve all users from the database
 @app.get("/users/{user_id}")
-def get_user(user_id: int, conn=Depends(get_db)):
-    cur = conn.cursor()
-    cur.execute("SELECT id, username, email, display_name, given_name, family_name, title, location, picture_url, verified FROM users WHERE id=%s", (user_id,))
-    user = cur.fetchone()
-    cur.close()
+def get_user(user_id: int):
+    user = user_repository.get_user_by_id(user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    # Map row to dict
-    columns = ["id","username","email","display_name","given_name","family_name","title","location","picture_url","verified"]
-    return dict(zip(columns, user))
+        return {"error": "User not found"}
+    return user
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    title: Optional[str] = None
+    location: Optional[str] = None
 
 @app.put("/users/{user_id}")
-def update_user(user_id: int, data: dict = Body(...), conn=Depends(get_db)):
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE users
-        SET display_name=%s,
-            given_name=%s,
-            family_name=%s,
-            title=%s,
-            location=%s,
-            updated_at=CURRENT_TIMESTAMP
-        WHERE id=%s
-        RETURNING id, username, email, display_name, given_name, family_name, title, location, picture_url, verified
-    """, (
-        data["display_name"],
-        data["given_name"],
-        data["family_name"],
-        data.get("title"),
-        data.get("location"),
-        user_id
-    ))
-
-    updated = cur.fetchone()
-    conn.commit()
-    cur.close()
-
+def update_user(user_id: int, user: UserUpdate):
+    user_repository.update_user(user_id, {
+        "display_name": user.name,
+        "given_name": user.name.split(" ")[0] if user.name else "",
+        "family_name": " ".join(user.name.split(" ")[1:]) if user.name and len(user.name.split(" ")) > 1 else "",
+        "title": user.title,
+        "location": user.location,
+    })
+    updated = user_repository.get_user_by_id(user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
+    return updated
 
-    columns = ["id","username","email","display_name","given_name","family_name","title","location","picture_url","verified"]
-    return dict(zip(columns, updated))
-
+    
 # ==================== RUN SERVER ====================
 if __name__ == "__main__":
     import uvicorn
