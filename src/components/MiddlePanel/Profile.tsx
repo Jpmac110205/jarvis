@@ -130,7 +130,7 @@ useEffect(() => {
       </div>
 
       {/* Top summary */}
-      <section className="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-5 shadow-lg backdrop-blur flex gap-4 items-center">
+      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex gap-4 items-center shadow-lg">
 
         <div className="flex-1 flex items-center gap-3">
           {user?.picture_url ? (
@@ -155,15 +155,15 @@ useEffect(() => {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
-          <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-700/40 px-3 py-2">
             <p className="text-xs text-neutral-400">Tasks</p>
             <p className="text-lg font-semibold text-neutral-50">{form.task_number}</p>
           </div>
-          <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-700/40 px-3 py-2">
             <p className="text-xs text-neutral-400">Chats</p>
             <p className="text-lg font-semibold text-neutral-50">{form.chat_number}</p>
           </div>
-          <div className="rounded-xl border border-neutral-800/70 bg-neutral-800/40 px-3 py-2">
+          <div className="rounded-xl border border-neutral-800/70 bg-neutral-700/40 px-3 py-2">
             <p className="text-xs text-neutral-400">PDFs</p>
             <p className="text-lg font-semibold text-neutral-50">{form.pdf_number}</p>
           </div>
@@ -299,14 +299,17 @@ function GoogleButton () {
       type="button"
     >
               <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#34A853" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-1616z" />
-                <path fill="#34A853" d="M34.59 15.41l-11.3 11.3-5.88-5.88a2 2 0 10-2.83 2.83l7.29 7.29a2 2 0 002.83 0l12.71-12.71a2 2 0 10-2.83-2.83z" />
+                <path fill="#34A853" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.9
+5 20-20S35.05 4 24 4zm0 36c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16
+ 16z" />
+                <path fill="#34A853" d="M34.59 15.41l-11.3 11.3-5.88-5.88a2 2 0 10-2.83
+ 2.83l7.29 7.29a2 2 0 002.83 0l12.71-12.71a2 2 0 10-2.83-2.83z" />
                 <path fill="none" d="M0 0h48v48H0z" />
               </svg>
-              <span>Google Connected</span>
-            </button>
-      )
-    }
+      <span>Google Connected</span>
+    </button>
+    )
+  }
 }
 function AppleButton() {
   const [connectedToApple] = reactUseState(false);

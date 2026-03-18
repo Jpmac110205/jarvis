@@ -78,10 +78,12 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
             <div className="flex justify-start">
               <div className="relative max-w-3xl w-full">
                 <div className="absolute left-0 top-0 h-full w-1 rounded-l-md bg-blue-600 shadow-md opacity-90" />
-                <div className={`pl-4 pr-5 pb-5 pt-4 bg-neutral-900/75 border border-neutral-800 rounded-r-lg ml-3 shadow-lg transform transition hover:scale-[1.01] hover:shadow-2xl`}> 
+                <div className={`pl-4 pr-5 pb-5 pt-4 bg-neutral-900/75 border border-neutral-800 rounded-r-lg ml-3 shadow-lg transform transition hover:scale-[1.01] hover:shadow-2xl`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-neutral-800/20 to-neutral-700/20 flex items-center justify-center text-sm font-semibold text-neutral-100 ring-1 ring-neutral-800">P</div>
+                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-neutral-800/20 to-neutral-700/20 flex items-center justify-center ring-1 ring-neutral-800 overflow-hidden p-0">
+                        <img src="/prodigyp.png" alt="Prodigy" className="h-9 w-9 object-cover" />
+                      </div>
                       <div>
                         <div className="text-sm font-semibold">Prodigy</div>
                         <div className="text-xs text-neutral-400">{msg.timestamp}</div>
@@ -89,7 +91,6 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
                     </div>
                     <div className="flex items-center gap-3">
                       <button
-                      //Handle ID copying with clipboard API and show "Copied" feedback
                         onClick={() => handleCopy(msg.content, msg.id)}
                         className="text-xs text-neutral-300 hover:text-white transition px-2 py-1 rounded-md bg-neutral-800/30 hover:bg-neutral-800/40"
                       >
