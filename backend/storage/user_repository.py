@@ -104,6 +104,8 @@ def update_user(user_id, data):
         family_name=%s,
         title=%s,
         location=%s,
+        system_prompt=%s,
+        picture_url=%s,
         updated_at=CURRENT_TIMESTAMP
     WHERE id=%s
     """
@@ -114,6 +116,8 @@ def update_user(user_id, data):
         data["family_name"],
         data.get("title"),
         data.get("location"),
+        data.get("system_prompt"),
+        data.get("picture_url"),
         user_id
     ))
 

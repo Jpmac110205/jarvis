@@ -50,6 +50,8 @@ app.add_middleware(
 current_results = {
     "chat_history": [],  # Will store conversation history
 }
+user_tokens = {}  # key: user_id, value: token_data
+
 
 
 #Create a user class to be able to store initial keys for the database
@@ -59,17 +61,56 @@ class UserCreate(BaseModel):
     given_name: str
     family_name: str
     picture_url: Optional[str] = None
+    system_prompt: Optional[str] = None
     
     
+def format_google_data(events_data: dict, tasks_data: dict) -> str:
+    lines = []
 
-def create_system_message(user_data: dict = None):
+    # Format calendar events
+    events = events_data.get("items", [])
+    if events:
+        lines.append("=== Upcoming Calendar Events ===")
+        for event in events[:20]:  # cap at 20
+            title = event.get("summary", "Untitled")
+            start = event.get("start", {})
+            start_time = start.get("dateTime") or start.get("date", "Unknown time")
+            location = event.get("location", "")
+            loc_str = f" @ {location}" if location else ""
+            lines.append(f"- {title}{loc_str} | {start_time}")
+    else:
+        lines.append("=== No upcoming calendar events ===")
+
+    # Format tasks
+    tasks = tasks_data.get("items", [])
+    if tasks:
+        lines.append("\n=== Pending Tasks ===")
+        for task in tasks[:20]:  # cap at 20
+            title = task.get("title", "Untitled")
+            due = task.get("due", "")
+            due_str = f" (due {due})" if due else ""
+            list_title = task.get("listTitle", "")
+            lines.append(f"- [{list_title}] {title}{due_str}")
+    else:
+        lines.append("\n=== No pending tasks ===")
+
+    return "\n".join(lines)
+
+
+def create_system_message(user_data: dict = None, calendar_context: str = ""):
     name = user_data.get("name", "") if user_data else ""
     title = user_data.get("title", "") if user_data else ""
     location = user_data.get("location", "") if user_data else ""
+    system_prompt = user_data.get("system_prompt", "") if user_data else ""
 
     user_line = ""
     if name or title or location:
         user_line = f"\nYour user's name is {name}, they work as a {title} based in {location}."
+    custom_prompt = f"\n\nAdditional instructions from the user:\n{system_prompt}" if system_prompt else ""
+    
+    calendar_section = f"\n\n=== User's Live Google Data ===\n{calendar_context}" if calendar_context else ""
+
+
 
     return SystemMessage(
         content=(
@@ -87,6 +128,8 @@ def create_system_message(user_data: dict = None):
 
             Maintain a professional, calm, and helpful tone with light, restrained humor when appropriate.
             Be concise by default, and expand only when deeper explanation is clearly useful.
+            {custom_prompt}
+            {calendar_section}
             """
         ).strip()
     )
@@ -180,65 +223,53 @@ model = ChatOpenAI(
 # Update the /chat endpoint
 @app.post("/chat")
 async def chat(request: Request):
-    """
-    Chat endpoint for discussing analysis results
-    Uses the current prediction results in context
-    """
     try:
         data = await request.json()
         user_message = data.get("message", "").strip()
         
-        # Get user_id from header or cookie
         user_id = request.headers.get("X-User-ID")
         if not user_id:
             user_id = request.cookies.get("user_id")
 
-        print(f"[/chat] user_id from request: {user_id}")
-
-        # Look up user profile for system prompt context
         user_profile = None
+        calendar_context = ""
+
         if user_id:
             db_user = user_repository.get_user_by_google_id(user_id)
-            print(f"[/chat] db_user fetched: {db_user}")
             if db_user:
                 user_profile = {
                     "name": db_user.get("display_name"),
                     "title": db_user.get("title"),
                     "location": db_user.get("location"),
+                    "system_prompt": db_user.get("system_prompt")
                 }
-                print(f"[/chat] user_profile built: {user_profile}")
-        else:
-            print(f"[/chat] No user_id found — system prompt will have no user context")
 
-        system_msg = create_system_message(user_profile)
-        print(f"[/chat] system message content: {system_msg.content}")
-        
-        # Build messages for the model - include system message first
-        messages = [create_system_message(user_profile)] + current_results["chat_history"] + [HumanMessage(content=user_message)]
-        
-        # Get response from model
-        print(f"[/chat] full messages sent to model: {[m.content for m in messages]}")
+            # Fetch calendar and tasks if token exists
+            user_token_data = user_tokens.get(user_id)
+            if user_token_data:
+                access_token = user_token_data["tokens"].get("access_token")
+                if access_token:
+                    try:
+                        events_data = get_upcoming_events(access_token)
+                        tasks_data = get_tasks(access_token)
+                        calendar_context = format_google_data(events_data, tasks_data)
+                    except Exception as e:
+                        print(f"Failed to fetch Google data for chat: {e}")
+
+        messages = [create_system_message(user_profile, calendar_context)] + current_results["chat_history"] + [HumanMessage(content=user_message)]
         response = model.invoke(messages)
         response_text = response.content
-        
-        # Update chat history with both user message and AI response
+
         current_results["chat_history"].append(HumanMessage(content=user_message))
         current_results["chat_history"].append(AIMessage(content=response_text))
-        
-        return {
-            "reply": response_text,
-            "error": None
-        }
-    
+
+        return {"reply": response_text, "error": None}
+
     except Exception as e:
         print(f"Chat error: {str(e)}")
         import traceback
         traceback.print_exc()
-        
-        return {
-            "reply": "An error occurred while processing your message. Please try again.",
-            "error": str(e)
-        }
+        return {"reply": "An error occurred while processing your message. Please try again.", "error": str(e)}
 
 
 @app.post("/export/conversation")
@@ -279,7 +310,6 @@ REDIRECT_URI = os.getenv("REDIRECT_URI")
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
-user_tokens = {}  # key: user_id, value: token_data
 
 
 @app.get("/auth/google/login")
@@ -554,15 +584,19 @@ async def auth_status(
 
     if not existing_user:
         user_repository.create_user(
-        UserCreate(
-            email=profile.get("email", ""),
-            display_name=profile.get("name", ""),
-            given_name=profile.get("given_name", ""),
-            family_name=profile.get("family_name", ""),
-            picture_url=profile.get("picture", "")
-        ),
-        google_id=user_id
-    )
+            UserCreate(
+                email=profile.get("email", ""),
+                display_name=profile.get("name", ""),
+                given_name=profile.get("given_name", ""),
+                family_name=profile.get("family_name", ""),
+                picture_url=profile.get("picture", ""),
+                system_prompt=profile.get("system_prompt", ""),
+                chats=0,
+                tasks=0,
+                pdfs=0
+            ),
+            google_id=user_id
+        )
     existing_user = user_repository.get_user_by_google_id(user_id)
     return {
     "authenticated": True,
@@ -570,10 +604,14 @@ async def auth_status(
         "id": existing_user["id"],
         "email": profile.get("email"),
         "name": existing_user.get("display_name") or profile.get("name"),
-        "picture": profile.get("picture"),
+        "picture_url": profile.get("picture"),
         "title": existing_user.get("title"),
         "location": existing_user.get("location"),
-        "created_at": existing_user["created_at"].isoformat() if existing_user and existing_user.get("created_at") else None
+        "created_at": existing_user["created_at"].isoformat() if existing_user and existing_user.get("created_at") else None,
+        "system_prompt": existing_user.get("system_prompt") or "",
+        "chats_number": existing_user.get("chats", 0) if existing_user else 0,
+        "tasks_number": existing_user.get("tasks", 0) if existing_user else 0,
+        "pdfs_number": existing_user.get("pdfs", 0) if existing_user else 0,    
     }
 }
 
@@ -609,7 +647,7 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     title: Optional[str] = None
     location: Optional[str] = None
-
+    system_prompt: Optional[str] = None
 @app.put("/users/{user_id}")
 def update_user(user_id: int, user: UserUpdate):
     user_repository.update_user(user_id, {
@@ -618,6 +656,11 @@ def update_user(user_id: int, user: UserUpdate):
         "family_name": " ".join(user.name.split(" ")[1:]) if user.name and len(user.name.split(" ")) > 1 else "",
         "title": user.title,
         "location": user.location,
+        "system_prompt": user.system_prompt,
+        "tasks": user.tasks_number,
+        "chats": user.chats_number,
+        "pdfs": user.pdfs_number,
+        "picture_url": user.picture_url if user.picture_url else None
     })
     updated = user_repository.get_user_by_id(user_id)
     if not updated:

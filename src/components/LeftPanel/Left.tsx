@@ -11,7 +11,7 @@ export function LeftPanel({
   const active = "bg-gradient-to-r from-blue-600/20 to-blue-500/10 text-white border border-blue-500/30 shadow-lg shadow-blue-500/10";
 
   return (
-    <aside className="w-64 bg-neutral-900/40 backdrop-blur-xl border-r border-neutral-800/50 p-5 shadow-2xl">
+    <aside className="min-h-screen w-64 bg-neutral-900/40 backdrop-blur-xl border-r border-neutral-800/50 p-5 shadow-2xl">
       <h2 className="text-xs uppercase tracking-wider text-neutral-500 mb-6 font-semibold">
         Workspace
       </h2>
