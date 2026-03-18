@@ -1,4 +1,3 @@
-import profile
 
 from fastapi import FastAPI, File, UploadFile, Request, HTTPException, Cookie
 from fastapi.middleware.cors import CORSMiddleware 
@@ -41,12 +40,11 @@ app = FastAPI()
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://prodigyaiassistant.onrender.com",],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://undefied-spriggy-germaine.ngrok-free.dev","https://prodigyaiassistant.onrender.com",],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Content-Type", "Authorization", "X-User-ID"],
-
-)
+    )
 
 # ==================== GLOBAL STATE ====================
 current_results = {
@@ -555,9 +553,17 @@ async def auth_status(
     existing_user = user_repository.get_user_by_google_id(user_id)
 
     if not existing_user:
-        user_repository.create_user(...)
-        existing_user = user_repository.get_user_by_google_id(user_id)
-
+        user_repository.create_user(
+        UserCreate(
+            email=profile.get("email", ""),
+            display_name=profile.get("name", ""),
+            given_name=profile.get("given_name", ""),
+            family_name=profile.get("family_name", ""),
+            picture_url=profile.get("picture", "")
+        ),
+        google_id=user_id
+    )
+    existing_user = user_repository.get_user_by_google_id(user_id)
     return {
     "authenticated": True,
     "user": {

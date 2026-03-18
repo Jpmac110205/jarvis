@@ -100,32 +100,29 @@ export function GoogleDataProvider({ children }: { children: React.ReactNode }) 
     }
   }
 
-useEffect(() => {
-  // Small delay to allow App.tsx to save user_id from URL params first
-  const timer = setTimeout(() => {
+  useEffect(() => {
     fetchAll();
-  }, 100);
-  return () => clearTimeout(timer);
-}, []);
+  }, []);
 
   // Watch for user_id changes in localStorage
   useEffect(() => {
-  const interval = setInterval(() => {
     const userId = localStorage.getItem('user_id');
+    
+    // If user_id changed, re-fetch
     if (userId && userId !== trackedUserId) {
-      console.log('User_id detected, fetching Google data:', userId);
+      console.log('User_id detected in localStorage, fetching Google data:', userId);
       setTrackedUserId(userId);
       fetchAll();
     } else if (!userId && trackedUserId) {
+      // User logged out
+      console.log('User logged out');
       setTrackedUserId(null);
       setConnected(false);
       setAgenda([]);
       setTodayAgenda([]);
       setTasks([]);
     }
-  }, 500);
-  return () => clearInterval(interval);
-}, [trackedUserId]);
+  }, [trackedUserId]);
 
   return (
     <GoogleDataContext.Provider

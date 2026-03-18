@@ -10,9 +10,8 @@
     "dev": "concurrently \"npm:dev:db\" \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:db": "brew services start postgresql@14 && echo 'PostgreSQL started.'",
     "dev:frontend": "vite",
-    "dev:backend": "concurrently \"npm:backend:server\" \"wait-on tcp:8080 && npm run backend:ngrok\"",
-    "backend:server": "cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload",
-    "backend:ngrok": "ngrok http 8080"
+   "dev:backend": "npm run backend:server",
+"backend:server": "cd backend && ../venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -38,7 +37,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "npm:rolldown-vite@7.2.5",
-    "wait-on": "^7.0.1"
+    "wait-on": "^9.0.4"
   },
   "overrides": {
     "vite": "npm:rolldown-vite@7.2.5"
