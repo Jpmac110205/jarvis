@@ -27,6 +27,10 @@ import secrets
 
 from storage import user_repository
 
+from docs.pdf_to_txt import pdf_to_txt
+from ingestion_pipeline import load_document, split_documents, create_vector_store
+from retrieval_pipeline import embedding_model, db
+
 
 
 # ==================== SETUP ====================
@@ -133,6 +137,16 @@ def create_system_message(user_data: dict = None, calendar_context: str = ""):
             """
         ).strip()
     )
+
+def embed_on_upload(file_path: str):
+    txt_path = pdf_to_txt(file_path)
+    with open(txt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    documents = load_document(txt_path)
+    chunks = split_documents(documents)
+    create_vector_store(chunks)
+    print("Document ingested and embedded successfully.")
+    
     
 dist_dir = os.path.join(os.path.dirname(__file__), "dist")
 app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
@@ -666,8 +680,14 @@ def update_user(user_id: int, user: UserUpdate):
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
     return updated
+@app.post("/upload")
+async def upload_file(file: UploadFile):
+    contents = await file.read()
+    with open(file.filename, "wb") as f:
+        f.write(contents)
+    embed_on_upload(file.filename)
+    return {"message": "File uploaded and embedded successfully."}
 
-    
 # ==================== RUN SERVER ====================
 if __name__ == "__main__":
     import uvicorn
