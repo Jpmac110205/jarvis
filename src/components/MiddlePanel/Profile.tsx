@@ -5,8 +5,7 @@ import { useState, useEffect } from "react";
 
 export function ProfilePanel() {
 
-  // With this — add a separate editable form state:
-const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
   const [form, setForm] = useState({ name: "", email: "", title: "", location: "", system_prompt: "", chat_number: 0, task_number: 0, pdf_number: 0, picture_url: "" });
   const [nameEmailLocked, setNameEmailLocked] = useState(false);
 

@@ -27,9 +27,10 @@ import secrets
 
 from storage import user_repository
 
-from docs.pdf_to_txt import pdf_to_txt
 from ingestion_pipeline import load_document, split_documents, create_vector_store
 from retrieval_pipeline import embedding_model, db
+import tempfile
+
 
 
 
@@ -100,6 +101,26 @@ def format_google_data(events_data: dict, tasks_data: dict) -> str:
 
     return "\n".join(lines)
 
+def classify_query(query: str) -> str:
+    """Returns 'RAG', 'WEB', or 'LLM'"""
+    classification_response = model.invoke([
+        SystemMessage(content=
+    """You are a query router. Classify the user's query into exactly one category:
+
+    - RAG: Requires searching the user's personal documents, notes, or uploaded files
+    - WEB: Requires real-time, current, or external information (news, weather, live data)  
+    - LLM: Can be answered from general world knowledge alone
+
+    Reply with only one word: RAG, WEB, or LLM. No punctuation, no explanation.
+    """.strip()),
+            HumanMessage(content=query)
+    ])
+    result = classification_response.content.strip().upper()
+    if result not in ("RAG", "WEB", "LLM"):
+        result = "LLM"  # safe fallback
+    print(f"[Router] Query classified as: {result}")
+    return result
+
 
 def create_system_message(user_data: dict = None, calendar_context: str = ""):
     name = user_data.get("name", "") if user_data else ""
@@ -128,6 +149,7 @@ def create_system_message(user_data: dict = None, calendar_context: str = ""):
             - Prefer accuracy and clarity over verbosity.
             - Cite provided sources explicitly when using them (e.g., "According to your course notes…").
             - If sources conflict, acknowledge the uncertainty.
+            - When refrencing calendar events or tasks, restate the event or task then explain what you think it means for the user and how it might impact their schedule or priorities.
             - If a question cannot be answered with the available context, say so.
 
             Maintain a professional, calm, and helpful tone with light, restrained humor when appropriate.
@@ -138,14 +160,7 @@ def create_system_message(user_data: dict = None, calendar_context: str = ""):
         ).strip()
     )
 
-def embed_on_upload(file_path: str):
-    txt_path = pdf_to_txt(file_path)
-    with open(txt_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    documents = load_document(txt_path)
-    chunks = split_documents(documents)
-    create_vector_store(chunks)
-    print("Document ingested and embedded successfully.")
+
     
     
 dist_dir = os.path.join(os.path.dirname(__file__), "dist")
@@ -234,7 +249,13 @@ model = ChatOpenAI(
     openai_api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-# Update the /chat endpoint
+def embed_on_upload(file_path: str, doc_type: str = "default"):
+    # No more pdf_to_txt() needed — load_document handles both
+    documents = load_document(file_path)
+    chunks = split_documents(documents, doc_type=doc_type, filename=os.path.basename(file_path))
+    create_vector_store(chunks)
+    print(f"[Ingest] {file_path} ingested successfully.")
+
 @app.post("/chat")
 async def chat(request: Request):
     try:
@@ -258,7 +279,6 @@ async def chat(request: Request):
                     "system_prompt": db_user.get("system_prompt")
                 }
 
-            # Fetch calendar and tasks if token exists
             user_token_data = user_tokens.get(user_id)
             if user_token_data:
                 access_token = user_token_data["tokens"].get("access_token")
@@ -270,14 +290,49 @@ async def chat(request: Request):
                     except Exception as e:
                         print(f"Failed to fetch Google data for chat: {e}")
 
-        messages = [create_system_message(user_profile, calendar_context)] + current_results["chat_history"] + [HumanMessage(content=user_message)]
+
+        # ==================== ROUTING ====================
+        route = classify_query(user_message)
+        context_block = ""
+
+        if route == "RAG":
+            try:
+                query_embedding = embedding_model.embed_query(user_message)
+                rag_results = db.similarity_search_by_vector(query_embedding, k=4)
+                if rag_results:
+                    context_block = "\n\n=== Retrieved Context From Your Documents ===\n"
+                    context_block += "\n---\n".join([
+                        f"[{doc.metadata.get('source', 'unknown')}]\n{doc.page_content}"
+                        for doc in rag_results
+                    ])
+                else:
+                    context_block = "\n\n[RAG attempted but no relevant documents found. Answering from general knowledge.]"
+            except Exception as e:
+                print(f"[RAG] Retrieval failed: {e}")
+                context_block = "\n\n[Document retrieval failed. Answering from general knowledge.]"
+
+        elif route == "WEB":
+            # Placeholder until you wire in Brave/Tavily
+            context_block = "\n\n[Web search not yet implemented. Answering from general knowledge — this answer may be outdated.]"
+
+        # Append context to the user message so the model sees it
+        augmented_message = user_message
+        if context_block:
+            augmented_message = f"{user_message}\n{context_block}"
+
+        # ==================== INVOKE ====================
+        messages = (
+            [create_system_message(user_profile, calendar_context)]
+            + current_results["chat_history"]
+            + [HumanMessage(content=augmented_message)]
+        )
         response = model.invoke(messages)
         response_text = response.content
 
         current_results["chat_history"].append(HumanMessage(content=user_message))
         current_results["chat_history"].append(AIMessage(content=response_text))
 
-        return {"reply": response_text, "error": None}
+        return {"reply": response_text, "route": route, "error": None}
 
     except Exception as e:
         print(f"Chat error: {str(e)}")
@@ -680,13 +735,36 @@ def update_user(user_id: int, user: UserUpdate):
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
     return updated
+
 @app.post("/upload")
-async def upload_file(file: UploadFile):
+async def upload_file(
+    file: UploadFile,
+    doc_type: str = Form(default="default")
+):
+    # Validate file type server-side too
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    
+    # Write to a known temp location with the original filename preserved
+    upload_dir = os.path.join(backend_dir, "uploaded_docs")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_path = os.path.join(upload_dir, file.filename)
+    
     contents = await file.read()
-    with open(file.filename, "wb") as f:
+    with open(file_path, "wb") as f:
         f.write(contents)
-    embed_on_upload(file.filename)
-    return {"message": "File uploaded and embedded successfully."}
+    
+    try:
+        embed_on_upload(file_path, doc_type=doc_type)
+    except Exception as e:
+        # Clean up the file if ingestion fails
+        os.remove(file_path)
+        print(f"[Upload] Ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"File saved but ingestion failed: {str(e)}")
+    
+    print(f"[Upload] {file.filename} uploaded and ingested successfully.")
+    return {"filename": file.filename, "status": "ingested", "doc_type": doc_type}
 
 # ==================== RUN SERVER ====================
 if __name__ == "__main__":

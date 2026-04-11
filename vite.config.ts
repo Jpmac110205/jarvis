@@ -8,11 +8,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/chat': 'http://localhost:8080',
-      '/events': 'http://localhost:8080',
-      '/tasks': 'http://localhost:8080',
-      '/auth': 'http://localhost:8080',
-      '/users': 'http://localhost:8080',
+      '/upload':  { target: 'http://localhost:8080', changeOrigin: true },
+      '/chat':    { target: 'http://localhost:8080', changeOrigin: true },
+      '/auth':    { target: 'http://localhost:8080', changeOrigin: true },
+      '/events':  { target: 'http://localhost:8080', changeOrigin: true },
+      '/tasks':   { target: 'http://localhost:8080', changeOrigin: true },
+      '/users':   { target: 'http://localhost:8080', changeOrigin: true },
+      '/export':  { target: 'http://localhost:8080', changeOrigin: true },
     }
   },
   build: {

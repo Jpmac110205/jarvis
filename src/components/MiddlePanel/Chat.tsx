@@ -17,25 +17,79 @@ export default function Chat({
   isTyping?: boolean;
 })
 {
-  const handleUpoad = async (file: File) => {
+
+  const [uploadState, setUploadState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [uploadError, setUploadError] = useState<string>("");
+
+  useEffect(() => {
+    if (uploadState === "success" || uploadState === "error") {
+      const timer = setTimeout(() => {
+        setUploadState("idle");
+        setUploadError("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploadState]);
+
+  const handleUpload = async (file: File) => {
+    // Client-side file type check
+    if (!file.name.endsWith(".pdf")) {
+      setUploadError("Only PDF files are supported.");
+      setUploadState("error");
+      return;
+    }
+
+    setUploadState("loading");
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
+
     try {
-      const res = await fetch('/upload', {
-        method: 'POST',
+      const res = await fetch("/upload", {
+        method: "POST",
         body: formData,
       });
+
       if (!res.ok) {
-        console.error('Upload failed', await res.text());
+        const errorData = await res.json().catch(() => ({ detail: "Unknown error" }));
+        setUploadError(errorData.detail || `Upload failed (${res.status})`);
+        setUploadState("error");
+      } else {
+        setUploadState("success");
       }
     } catch (e) {
-      console.error('Upload error', e);
+      setUploadError("Network error — could not reach server.");
+      setUploadState("error");
     }
   };
   return (
     <div className="flex-1 w-full max-w-3xl flex flex-col overflow-hidden">
+      {uploadState === "loading" && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-neutral-700 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
+          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          Uploading PDF...
+        </div>
+      )}
+      {uploadState === "success" && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow z-50">
+          ✓ PDF uploaded successfully!
+        </div>
+      )}
+      {uploadState === "error" && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded shadow z-50">
+          ✗ {uploadError}
+        </div>
+      )}
       <ChatPanel messages={messages} isTyping={isTyping} />
-      <ChatInput input={input} onChange={onChange} onSend={onSend} handleUpoad={handleUpoad} />
+      <ChatInput
+        input={input}
+        onChange={onChange}
+        onSend={onSend}
+        handleUpload={handleUpload}
+        uploadState={uploadState}
+      />
     </div>
   );
 }
@@ -93,7 +147,7 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
             <div className="flex justify-start">
               <div className="relative max-w-3xl w-full">
                 <div className="absolute left-0 top-0 h-full w-1 rounded-l-md bg-blue-600 shadow-md opacity-90" />
-                <div className={`pl-4 pr-5 pb-5 pt-4 bg-neutral-900/75 border border-neutral-800 rounded-r-lg ml-3 shadow-lg transform transition hover:scale-[1.01] hover:shadow-2xl`}>
+                <div className="pl-4 pr-5 pb-5 pt-4 bg-neutral-900/75 border border-neutral-800 rounded-r-lg ml-3 shadow-lg transform transition hover:scale-[1.01] hover:shadow-2xl">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-full bg-gradient-to-br from-neutral-800/20 to-neutral-700/20 flex items-center justify-center ring-1 ring-neutral-800 overflow-hidden p-0">
@@ -109,12 +163,12 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
                         onClick={() => handleCopy(msg.content, msg.id)}
                         className="text-xs text-neutral-300 hover:text-white transition px-2 py-1 rounded-md bg-neutral-800/30 hover:bg-neutral-800/40"
                       >
-                        {copiedId === "000" ? 'Copied' : 'Copy'}
+                        {copiedId === msg.id.toString() ? 'Copied' : 'Copy'}
                       </button>
                       <button className="text-xs text-neutral-300 hover:text-white transition px-2 py-1 rounded-md bg-neutral-800/30 hover:bg-neutral-800/40">Reply</button>
                     </div>
                   </div>
-                  <div className={`mt-4 text-sm leading-relaxed whitespace-pre-wrap text-neutral-100}`}>
+                  <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-neutral-100">
                     {msg.content}
                   </div>
                 </div>
@@ -128,30 +182,29 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
   );
 }
 
-function ChatInput({ input, onChange, onSend, handleUpoad }: { input: string; onChange: (v: string) => void; onSend: () => void; handleUpoad: (file: File) => void; }) {
+function ChatInput({ input, onChange, onSend, handleUpload, uploadState }: { input: string; onChange: (v: string) => void; onSend: () => void; handleUpload: (file: File) => void; uploadState: "idle" | "loading" | "success" | "error"; }) {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = "0px";
-    const newHeight = Math.max(ta.scrollHeight, 40);
-    ta.style.height = `${newHeight}px`;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.max(ta.scrollHeight, 40)}px`;
   }, [input]);
 
   function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget;
-    ta.style.height = "0px";
-    ta.style.height = `${ta.scrollHeight}px`;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.max(ta.scrollHeight, 40)}px`;
     onChange(ta.value);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleUpoad(files[0]);
-      e.target.value = ""; // reset so same file can be uploaded again
+      handleUpload(files[0]);
+      e.target.value = "";
     }
   }
 
@@ -171,19 +224,22 @@ function ChatInput({ input, onChange, onSend, handleUpoad }: { input: string; on
           }}
           placeholder="Type your message..."
           rows={1}
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-400 text-neutral-100 resize-none overflow-hidden"
+          style={{ height: "40px" }}
+          className="flex-1 min-h-[40px] bg-transparent text-sm leading-5 outline-none placeholder:text-neutral-400 text-neutral-100 resize-none overflow-hidden py-1"
         />
         {/* Hidden file input */}
         <input
           type="file"
           ref={fileInputRef}
+          accept=".pdf"
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
         {/* Add button */}
         <button
           type="button"
-          className="p-2 rounded-xl bg-neutral-700/40 hover:bg-neutral-700/60 border border-transparent hover:border-blue-560/30 transition-all duration-200 hover:scale-105"
+          disabled={uploadState === "loading"}
+          className="p-2 rounded-xl bg-neutral-700/40 hover:bg-neutral-700/60 border border-transparent hover:border-blue-560/30 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Add Attachment"
           onClick={() => fileInputRef.current && fileInputRef.current.click()}
         >
