@@ -175,11 +175,27 @@ dist_dir = os.path.join(os.path.dirname(__file__), "dist")
 app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
 
 @app.get("/")
+def serve_landing():
+    landing = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    return FileResponse(landing)
+
+@app.get("/app")
 def serve_react():
     index_file = os.path.join(dist_dir, "index.html")
     if not os.path.exists(index_file):
         raise HTTPException(status_code=404, detail="React build not found. Run `npm run build`")
     return FileResponse(index_file)
+
+@app.get("/privacy")
+def serve_privacy():
+    privacy = os.path.join(os.path.dirname(__file__), "static", "privacy.html")
+    return FileResponse(privacy)
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+
+@app.get("/googleb6a142b0a0531b3b.html")
+def google_verify():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "googleb6a142b0a0531b3b.html"))
+
 
 def get_upcoming_events(access_token):
     """Fetch upcoming Google Calendar events"""
