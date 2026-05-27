@@ -1,7 +1,13 @@
-import { useLayoutEffect, useRef, useState, useEffect } from "react";
-import type { Message } from "../../App";
-import { PlusIcon, MicrophoneIcon } from '@heroicons/react/24/solid';
-import React from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { PlusIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
+
+
+export type ChatMessage = {
+  id: number;
+  author: "user" | "bot";
+  content: string;
+  timestamp: string;
+};
 
 export default function Chat({
   messages,
@@ -10,14 +16,12 @@ export default function Chat({
   onSend,
   isTyping = false,
 }: {
-  messages: Message[];
+  messages: ChatMessage[];
   input: string;
   onChange: (v: string) => void;
   onSend: () => void;
   isTyping?: boolean;
-})
-{
-
+}) {
   const [uploadState, setUploadState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [uploadError, setUploadError] = useState<string>("");
 
@@ -32,7 +36,6 @@ export default function Chat({
   }, [uploadState]);
 
   const handleUpload = async (file: File) => {
-    // Client-side file type check
     if (!file.name.endsWith(".pdf")) {
       setUploadError("Only PDF files are supported.");
       setUploadState("error");
@@ -61,27 +64,29 @@ export default function Chat({
       setUploadState("error");
     }
   };
+
   return (
-    <div className="flex-1 w-full max-w-3xl flex flex-col overflow-hidden">
+    <div className="flex-1 w-full max-w-3xl flex flex-col overflow-hidden relative">
+      {/* Toast notifications restyled to match Prodigy premium notifications */}
       {uploadState === "loading" && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-neutral-700 text-white px-4 py-2 rounded shadow z-50 flex items-center gap-2">
-          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-          </svg>
-          Uploading PDF...
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0c0c10] border border-[rgba(59,130,246,0.3)] text-[#f0f0f5] px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-slide-down">
+          <div className="w-4 h-4 rounded-full border-2 border-[rgba(59,130,246,0.15)] border-t-[#3b82f6] animate-spin" />
+          <span className="text-xs font-medium tracking-wide">Syncing vector embeddings...</span>
         </div>
       )}
       {uploadState === "success" && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded shadow z-50">
-          ✓ PDF uploaded successfully!
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0c0c10] border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 animate-slide-down">
+          <span className="text-sm font-semibold">✓</span>
+          <span className="text-xs font-medium tracking-wide">PDF registered in knowledge base permanently.</span>
         </div>
       )}
       {uploadState === "error" && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded shadow z-50">
-          ✗ {uploadError}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0c0c10] border border-red-500/30 text-red-400 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 animate-slide-down">
+          <span className="text-sm font-semibold">✗</span>
+          <span className="text-xs font-medium tracking-wide">{uploadError}</span>
         </div>
       )}
+      
       <ChatPanel messages={messages} isTyping={isTyping} />
       <ChatInput
         input={input}
@@ -94,12 +99,10 @@ export default function Chat({
   );
 }
 
-/* --------- Internal components (not exported) --------- */
-
-function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: boolean }) {
+/* --------- Chat Panel Frame (Internal) --------- */
+function ChatPanel({ messages, isTyping }: { messages: ChatMessage[]; isTyping: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Always stick to bottom when messages change (chat-like behavior).
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -116,7 +119,6 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
     return () => clearTimeout(t);
   }, [copiedId]);
 
-
   const handleCopy = async (text: string, id: number) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -125,50 +127,52 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
       console.warn('copy failed', e);
     }
   };
-  
 
   return (
-    <div ref={containerRef} className="flex-1 px-6 py-6 overflow-y-auto space-y-6 scrollbar-thin">
+    <div ref={containerRef} className="flex-1 px-6 py-8 overflow-y-auto space-y-6 scrollbar-thin">
       {messages.map((msg) => (
-        <div key={msg.id} className="w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div key={msg.id} className="w-full animate-[fadeUp_0.4s_ease_both]">
           {msg.author === 'user' ? (
-            <div className="flex justify-center">
-              <div className="max-w-2xl w-full bg-gradient-to-r from-neutral-800/40 to-neutral-800/30 border border-neutral-700/30 rounded-lg px-5 py-3 text-sm text-neutral-100 shadow-sm transform transition hover:scale-[1.01]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="px-2 py-1 rounded-md bg-blue-600 text-white text-xs font-medium shadow-sm">You</div>
-                    <div className="text-xs text-neutral-400">{msg.timestamp}</div>
-                  </div>
+            <div className="flex justify-end">
+              <div className="max-w-[85%] bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.18)] rounded-2xl px-5 py-3.5 text-sm text-[#f0f0f5] shadow-sm font-light leading-relaxed">
+                <div className="flex items-center gap-3 mb-2 opacity-50">
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-[#3b82f6]">Secure Node</div>
+                  <div className="text-[9px] font-mono">{msg.timestamp}</div>
                 </div>
-                <div className="mt-3 whitespace-pre-wrap text-sm">{msg.content}</div>
+                <div className="whitespace-pre-wrap">{msg.content}</div>
               </div>
             </div>
           ) : (
             <div className="flex justify-start">
-              <div className="relative max-w-3xl w-full">
-                <div className="absolute left-0 top-0 h-full w-1 rounded-l-md bg-blue-600 shadow-md opacity-90" />
-                <div className="pl-4 pr-5 pb-5 pt-4 bg-neutral-900/75 border border-neutral-800 rounded-r-lg ml-3 shadow-lg transform transition hover:scale-[1.01] hover:shadow-2xl">
+              <div className="relative max-w-[90%] w-full">
+                {/* Visual anchor line to match Prodigy cyber look */}
+                <div className="absolute left-0 top-0 h-full w-[1.5px] bg-gradient-to-b from-[#3b82f6] to-transparent opacity-60" />
+                
+                <div className="pl-6 pr-5 pb-5 pt-4 bg-[#0c0c10]/40 border border-white/5 rounded-r-2xl ml-3 shadow-xl transition-all hover:bg-[#0c0c10]/60 hover:border-white/10">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-neutral-800/20 to-neutral-700/20 flex items-center justify-center ring-1 ring-neutral-800 overflow-hidden p-0">
-                        <img src="/prodigyp.png" alt="Prodigy" className="h-9 w-9 object-cover" />
+                    <div className="flex items-center gap-3.5">
+                      <div className="h-9 w-9 rounded-xl bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.15)] flex items-center justify-center p-0.5">
+                        <img src="/prodigyp.png" alt="Prodigy Logo" className="h-full w-full object-contain rounded-lg" onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }} />
+                        <span className="font-['Syne'] font-extrabold text-[#3b82f6] text-sm">P</span>
                       </div>
                       <div>
-                        <div className="text-sm font-semibold">Prodigy</div>
-                        <div className="text-xs text-neutral-400">{msg.timestamp}</div>
+                        <div className="text-sm font-['Syne'] font-bold text-[#f0f0f5]">PRODIGY.</div>
+                        <div className="text-[9px] text-[#7a7a8c] font-mono">{msg.timestamp}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCopy(msg.content, msg.id)}
-                        className="text-xs text-neutral-300 hover:text-white transition px-2 py-1 rounded-md bg-neutral-800/30 hover:bg-neutral-800/40"
+                        className="text-[10px] tracking-wide text-[#7a7a8c] hover:text-[#f0f0f5] transition px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5"
                       >
                         {copiedId === msg.id.toString() ? 'Copied' : 'Copy'}
                       </button>
-                      <button className="text-xs text-neutral-300 hover:text-white transition px-2 py-1 rounded-md bg-neutral-800/30 hover:bg-neutral-800/40">Reply</button>
                     </div>
                   </div>
-                  <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-neutral-100">
+                  <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-[#c8c8d4] font-light">
                     {msg.content}
                   </div>
                 </div>
@@ -182,11 +186,24 @@ function ChatPanel({ messages, isTyping }: { messages: Message[]; isTyping: bool
   );
 }
 
-function ChatInput({ input, onChange, onSend, handleUpload, uploadState }: { input: string; onChange: (v: string) => void; onSend: () => void; handleUpload: (file: File) => void; uploadState: "idle" | "loading" | "success" | "error"; }) {
-  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+/* --------- Chat Input Bar (Internal) --------- */
+function ChatInput({
+  input,
+  onChange,
+  onSend,
+  handleUpload,
+  uploadState,
+}: {
+  input: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  handleUpload: (file: File) => void;
+  uploadState: "idle" | "loading" | "success" | "error";
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  React.useLayoutEffect(() => {
+  useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
@@ -209,9 +226,30 @@ function ChatInput({ input, onChange, onSend, handleUpload, uploadState }: { inp
   }
 
   return (
-    <footer className="px-6 py-3 bg-neutral-900/30 backdrop-blur-sm border-t border-neutral-800/50">
-      <div className="flex items-center gap-3 bg-neutral-800/50 backdrop-blur-sm border border-neutral-700/40 rounded-2xl px-4 py-3 shadow-lg focus-within:border-blue-600/50 focus-within:ring-2 focus-within:ring-blue-600/20 transition-all">
-        {/* Input field (auto-resizing) */}
+    <footer className="px-6 py-4 bg-[#050507]/80 backdrop-blur-md border-t border-[rgba(59,130,246,0.15)]">
+      <div className="flex items-center gap-3 bg-[#0c0c10] border border-[rgba(59,130,246,0.15)] rounded-2xl px-4 py-3 shadow-2xl focus-within:border-[rgba(59,130,246,0.45)] focus-within:shadow-[0_0_20px_rgba(59,130,246,0.06)] transition-all duration-300">
+        
+        {/* Attachment input hidden */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".pdf"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        
+        {/* Content insertion button */}
+        <button
+          type="button"
+          disabled={uploadState === "loading"}
+          className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-[rgba(59,130,246,0.15)] transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+          title="Add PDF context permanent memory"
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+        >
+          <PlusIcon className="h-4 w-4 text-[#7a7a8c] hover:text-[#3b82f6] transition-colors" />
+        </button>
+
+        {/* Dynamic growing text input container */}
         <textarea
           ref={textareaRef}
           value={input}
@@ -222,42 +260,26 @@ function ChatInput({ input, onChange, onSend, handleUpload, uploadState }: { inp
               onSend();
             }
           }}
-          placeholder="Type your message..."
+          placeholder="Ask Prodigy about your calendar, tasks or memory..."
           rows={1}
           style={{ height: "40px" }}
-          className="flex-1 min-h-[40px] bg-transparent text-sm leading-5 outline-none placeholder:text-neutral-400 text-neutral-100 resize-none overflow-hidden py-1"
+          className="flex-1 min-h-[40px] max-h-[160px] bg-transparent text-sm leading-6 outline-none placeholder:text-[#7a7a8c] text-[#f0f0f5] font-light resize-none overflow-y-auto py-1 scrollbar-none"
         />
-        {/* Hidden file input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept=".pdf"
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
-        {/* Add button */}
+
+        {/* Custom Dictation controls */}
         <button
           type="button"
-          disabled={uploadState === "loading"}
-          className="p-2 rounded-xl bg-neutral-700/40 hover:bg-neutral-700/60 border border-transparent hover:border-blue-560/30 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Add Attachment"
-          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-[rgba(59,130,246,0.15)] transition-all duration-200 flex-shrink-0"
+          title="Transcribe interface"
         >
-          <PlusIcon className="h-5 w-5 text-neutral-300 hover:text-blue-400 transition-colors" />
+          <MicrophoneIcon className="h-4 w-4 text-[#7a7a8c] hover:text-[#3b82f6] transition-colors" />
         </button>
-        {/* Microphone input */}
-        <button
-          type="button"
-          className="p-2 rounded-xl bg-neutral-700/40 hover:bg-neutral-700/60 border border-transparent hover:border-blue-600/30 transition-all duration-200 hover:scale-105"
-          title="Record Voice"
-        >
-          <MicrophoneIcon className="h-5 w-5 text-neutral-300 hover:text-blue-400 transition-colors" />
-        </button>
-        {/* Send button */}
+
+        {/* Submission module */}
         <button
           onClick={onSend}
           disabled={!input.trim()}
-          className="ml-2 px-4 py-2 text-sm font-medium rounded-xl bg-blue-600 text-white shadow transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+          className="ml-1 px-5 py-2.5 text-xs tracking-wide uppercase font-semibold rounded-xl bg-[#3b82f6] text-white shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-200 disabled:opacity-30 disabled:shadow-none hover:bg-[#2563eb] disabled:cursor-not-allowed flex-shrink-0"
         >
           Send
         </button>
@@ -265,19 +287,18 @@ function ChatInput({ input, onChange, onSend, handleUpload, uploadState }: { inp
     </footer>
   );
 }
+
+/* --------- Loading Indicator (Internal) --------- */
 function TypingIndicator() {
   return (
-    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-200">
-      <div className="max-w-3xl w-full bg-neutral-900/70 border border-neutral-800 rounded-lg p-5 shadow-md">
-        <div className="flex items-start gap-3">
-          <div className="h-9 w-9 rounded-full bg-neutral-800/30" />
-          <div>
-            <div className="h-3 w-32 rounded-md bg-neutral-800/40 mb-3" />
-            <div className="flex gap-1">
-              <span className="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
+    <div className="flex justify-start animate-pulse">
+      <div className="max-w-[400px] w-full bg-[#0c0c10]/40 border border-white/5 rounded-2xl p-4 ml-3 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="h-5 w-5 rounded-lg bg-white/5 animate-pulse" />
+          <div className="flex gap-1.5 items-center">
+            <span className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
         </div>
       </div>

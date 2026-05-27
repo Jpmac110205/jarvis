@@ -1,44 +1,51 @@
-import { useState as reactUseState } from 'react';
-import { useGoogleConnection } from "../../contexts/GoogleConnectionProvider";
-import { useState, useEffect } from "react";
-
+import React, { useState, useEffect } from "react";
 
 export function ProfilePanel() {
-
   const [user, setUser] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", email: "", title: "", location: "", system_prompt: "", chat_number: 0, task_number: 0, pdf_number: 0, picture_url: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    title: "",
+    location: "",
+    system_prompt: "",
+    chat_number: 0,
+    task_number: 0,
+    pdf_number: 0,
+    picture_url: ""
+  });
   const [nameEmailLocked, setNameEmailLocked] = useState(false);
 
-useEffect(() => {
-  const userId = localStorage.getItem('user_id');
-  fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/status`, {
-    credentials: 'include',
-    headers: userId ? { 'X-User-ID': userId } : {}
-  })
-    .then(res => res.json())
-    .then(data => {
-  if (data.authenticated) {
-    setUser(data.user);
-    setForm({
-      name: data.user.name || "",
-      email: data.user.email || "",
-      title: data.user.title || "",
-      location: data.user.location || "",
-      system_prompt: data.user.system_prompt || "",
-      chat_number: data.user.chats_number || 0,
-      task_number: data.user.tasks_number || 0,
-      pdf_number: data.user.pdfs_number || 0,
-      picture_url: data.user.picture_url || ""
-    });
-    // Lock name/email if both are present in DB
-    if (data.user.name && data.user.email) {
-      setNameEmailLocked(true);
-    } else {
-      setNameEmailLocked(false);
-    }
-  }
-});
-}, []);
+  useEffect(() => {
+    const userId = localStorage.getItem('user_id');
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/status`, {
+      credentials: 'include',
+      headers: userId ? { 'X-User-ID': userId } : {}
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          setUser(data.user);
+          // Flexibly match displayName, display_name, or name from backend payload
+          const userName = data.user.display_name || data.user.name || data.user.displayName || "";
+          setForm({
+            name: userName,
+            email: data.user.email || "",
+            title: data.user.title || "",
+            location: data.user.location || "",
+            system_prompt: data.user.system_prompt || "",
+            chat_number: data.user.chats_number || data.user.chats || 0,
+            task_number: data.user.tasks_number || data.user.tasks || 0,
+            pdf_number: data.user.pdfs_number || data.user.pdfs || 0,
+            picture_url: data.user.picture_url || ""
+          });
+          if (userName && data.user.email) {
+            setNameEmailLocked(true);
+          } else {
+            setNameEmailLocked(false);
+          }
+        }
+      });
+  }, []);
 
   const [selectedModel, setSelectedModel] = useState<string>("gpt-5-mini");
   const [saveStatus, setSaveStatus] = useState<null | "success" | "error" | "saving">(null);
@@ -54,22 +61,35 @@ useEffect(() => {
           'Content-Type': 'application/json',
           ...(userId ? { 'X-User-ID': userId } : {})
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          title: form.title,
+          location: form.location,
+          system_prompt: form.system_prompt,
+          chats_number: form.chat_number,
+          tasks_number: form.task_number,
+          pdfs_number: form.pdf_number,
+          picture_url: form.picture_url
+        })
       });
       if (res.ok) {
         const data = await res.json();
+        console.log("Saved user:", data);
+
         setUser(data);
+        const updatedName = data.display_name || data.name || data.displayName || "";
         setForm({
-          name: data.display_name || "",
-          email: data.email || "",
-          title: data.title || "",
-          location: data.location || "",
-          system_prompt: data.system_prompt || "",
-          chat_number: data.chats || 0,
-          task_number: data.tasks || 0,
-          pdf_number: data.pdfs || 0,
-          picture_url: data.picture_url || ""
-        });
+            name: data.display_name || "",
+            email: data.email || "",
+            title: data.title || "",
+            location: data.location || "",
+            system_prompt: data.system_prompt || "",
+            chat_number: data.chats_number || 0,
+            task_number: data.tasks_number || 0,
+            pdf_number: data.pdfs_number || 0,
+            picture_url: data.picture_url || ""
+          });
         setSaveStatus("success");
         setTimeout(() => setSaveStatus(null), 2000);
       } else {
@@ -82,285 +102,187 @@ useEffect(() => {
     }
   };
 
-  const modelInfo: Record<string, { label: string; cost: string; performance: string }>
- = {
+  const modelInfo: Record<string, { label: string; cost: string; performance: string }> = {
     "gpt-5-mini": { label: "GPT-5 mini", cost: "$0.003", performance: "Balanced: good quality with moderate latency." },
     "gpt-5-nano": { label: "GPT-5 nano", cost: "$0.0015", performance: "Very fast with smaller context and lighter accuracy." },
     "gpt-4o-mini": { label: "GPT-4o mini", cost: "$0.02", performance: "High throughput, strong for short-form tasks." },
     "gpt-4-1-mini": { label: "GPT-4.1 mini", cost: "$0.04", performance: "Highest quality, best for complex reasoning (higher latency)." },
   };
-  
+
   return (
-    <div className="w-full max-w-3xl px-6 py-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+    <div className="w-full max-w-3xl px-6 py-8 flex flex-col gap-6 h-fit min-h-0">
+      {/* Upper Layout Controls Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5">
         <div>
-          <h2 className="text-xl font-semibold text-neutral-100">Profile</h2>
-          <p className="text-sm text-neutral-400">Manage your account info, identity, and connections.</p>
+          <h2 className="font-['Syne'] font-extrabold text-2xl tracking-tight text-[#f0f0f5]">Identity Panel</h2>
+          <p className="text-sm text-[#7a7a8c] font-light mt-1">Configure authorization limits, profile cards, and prompt rules.</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-3 items-center">
           <button
             className={
-              `px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 ` +
+              `px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider font-semibold transition-all duration-300 hover:-translate-y-0.5 ` +
               (saveStatus === "success"
-                ? "bg-green-600 text-white"
+                ? "bg-emerald-600 text-white"
                 : saveStatus === "error"
                 ? "bg-red-600 text-white"
-                : "bg-blue-600 hover:from-blue-500 hover:to-blue-400 text-white")
+                : "bg-[#3b82f6] text-white shadow-[0_0_15px_rgba(59,130,246,0.15)] hover:bg-[#2563eb]")
             }
             onClick={handleSaveChanges}
             disabled={saveStatus === "saving"}
           >
             {saveStatus === "saving"
-              ? "Saving..."
+              ? "Syncing..."
               : saveStatus === "success"
-              ? "Saved!"
+              ? "Profile Saved"
               : saveStatus === "error"
-              ? "Error"
+              ? "System Error"
               : "Save Changes"}
           </button>
-          {saveStatus === "success" && (
-            <span className="ml-2 text-green-400 text-sm">✓ Changes saved</span>
-          )}
-          {saveStatus === "error" && (
-            <span className="ml-2 text-red-400 text-sm">Failed to save</span>
-          )}
         </div>
       </div>
 
-      {/* Top summary */}
-      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex gap-4 items-center shadow-lg">
+      {/* Profile Card Header Component */}
+      <section className="bg-[#0c0c10] border border-[rgba(59,130,246,0.15)] rounded-2xl p-6 flex flex-col sm:flex-row gap-5 items-center shadow-xl relative overflow-hidden w-full">
+        {/* Embedded mesh glow */}
+        <div className="absolute top-0 right-0 w-48 h-48 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.06)_0%,transparent_70%)]" />
 
-        <div className="flex-1 flex items-center gap-3">
-          {user?.picture_url ? (
+        <div className="flex items-center gap-4 w-full relative z-10">
+          {form.picture_url ? (
             <img
-  src={user.picture_url}
-  alt="Profile"
-  referrerPolicy="no-referrer"
-  className="w-12 h-12 rounded-full border border-neutral-700 shadow-md flex-shrink-0 object-cover"
-  onError={(e) => console.log("Image failed:", user.picture, e)}
-/>
+              src={form.picture_url}
+              alt="Profile"
+              referrerPolicy="no-referrer"
+              className="w-16 h-16 rounded-xl border border-[rgba(59,130,246,0.15)] shadow-xl object-cover flex-shrink-0"
+              onError={(e) => console.log("Image load exception handled natively", e)}
+            />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-neutral-700 border border-neutral-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-neutral-300 text-lg font-semibold">
-                {form.name?.charAt(0) || "?"}
+            <div className="w-16 h-16 rounded-xl bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.15)] flex items-center justify-center flex-shrink-0">
+              <span className="text-[#3b82f6] text-xl font-bold font-['Syne']">
+                {form.name?.charAt(0) || "P"}
               </span>
             </div>
           )}
+          {/* Assigned flex-1 and min-w-0 to prevent text containment constraints */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-[#3b82f6]">Verified Partner</p>
+            <p className="font-['Syne'] text-xl font-extrabold text-[#f0f0f5] mt-0.5 truncate">{form.name || "App Partner"}</p>
+            <p className="text-xs text-[#7a7a8c] font-light mt-1 truncate">
+              Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "Active user"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Meta counters card list */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-[#0c0c10]/50 border border-white/5 rounded-xl p-4">
+          <p className="text-[10px] uppercase tracking-widest text-[#7a7a8c] font-semibold mb-1">Conversations</p>
+          <p className="font-['Syne'] text-xl font-extrabold text-[#f0f0f5]">{form.chat_number}</p>
+        </div>
+        <div className="bg-[#0c0c10]/50 border border-white/5 rounded-xl p-4">
+          <p className="text-[10px] uppercase tracking-widest text-[#7a7a8c] font-semibold mb-1">Tasks logged</p>
+          <p className="font-['Syne'] text-xl font-extrabold text-[#f0f0f5]">{form.task_number}</p>
+        </div>
+        <div className="bg-[#0c0c10]/50 border border-white/5 rounded-xl p-4">
+          <p className="text-[10px] uppercase tracking-widest text-[#7a7a8c] font-semibold mb-1">Documents Indexed</p>
+          <p className="font-['Syne'] text-xl font-extrabold text-[#f0f0f5]">{form.pdf_number}</p>
+        </div>
+      </section>
+
+      {/* Primary form parameters with modern styled text boxes */}
+      <section className="bg-[#0c0c10]/40 border border-white/5 rounded-2xl p-6 space-y-5">
+        <h3 className="font-['Syne'] text-base font-bold text-[#f0f0f5] mb-2 border-b border-white/5 pb-2">User Details</h3>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-neutral-400">Prodigy partner</p>
-            <p className="text-lg font-semibold text-neutral-50">{form.name}</p>
-            <p className="text-xs text-neutral-400">Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "Unknown"}</p>
+            <label className="block text-xs uppercase tracking-widest text-[#7a7a8c] font-bold mb-2">Display Name</label>
+            <input
+              type="text"
+              value={form.name}
+              disabled={nameEmailLocked}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full bg-[#050507] border border-white/5 focus:border-[rgba(59,130,246,0.25)] rounded-xl px-4 py-3 text-sm text-[#f0f0f5] placeholder-[#7a7a8c] outline-none transition-colors disabled:opacity-40"
+              placeholder="E.g., Prodigy Master"
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-[#7a7a8c] font-bold mb-2">Email Address</label>
+            <input
+              type="email"
+              value={form.email}
+              disabled={nameEmailLocked}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="w-full bg-[#050507] border border-white/5 focus:border-[rgba(59,130,246,0.25)] rounded-xl px-4 py-3 text-sm text-[#f0f0f5] placeholder-[#7a7a8c] outline-none transition-colors disabled:opacity-40"
+              placeholder="name@example.com"
+            />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 text-center text-sm text-neutral-300">
-          <div className="rounded-xl border border-neutral-800/70 bg-neutral-700/40 px-3 py-2">
-            <p className="text-xs text-neutral-400">Tasks</p>
-            <p className="text-lg font-semibold text-neutral-50">{form.task_number}</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-[#7a7a8c] font-bold mb-2">Partner Title</label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="w-full bg-[#050507] border border-white/5 focus:border-[rgba(59,130,246,0.25)] rounded-xl px-4 py-3 text-sm text-[#f0f0f5] placeholder-[#7a7a8c] outline-none transition-colors"
+              placeholder="E.g., Lead Developer"
+            />
           </div>
-          <div className="rounded-xl border border-neutral-800/70 bg-neutral-700/40 px-3 py-2">
-            <p className="text-xs text-neutral-400">Chats</p>
-            <p className="text-lg font-semibold text-neutral-50">{form.chat_number}</p>
-          </div>
-          <div className="rounded-xl border border-neutral-800/70 bg-neutral-700/40 px-3 py-2">
-            <p className="text-xs text-neutral-400">PDFs</p>
-            <p className="text-lg font-semibold text-neutral-50">{form.pdf_number}</p>
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-[#7a7a8c] font-bold mb-2">Location Context</label>
+            <input
+              type="text"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="w-full bg-[#050507] border border-white/5 focus:border-[rgba(59,130,246,0.25)] rounded-xl px-4 py-3 text-sm text-[#f0f0f5] placeholder-[#7a7a8c] outline-none transition-colors"
+              placeholder="E.g., Berlin, DE"
+            />
           </div>
         </div>
       </section>
- 
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-        <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Account</h3>
-            <span className="text-[11px] text-neutral-400">Public</span>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Name"
-                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-                disabled={nameEmailLocked}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
-                placeholder="example@example.com"
-                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-                disabled={nameEmailLocked}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Role</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Role @ Example"
-                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Location</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
-                placeholder="Location"
-                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
-              />
-            </div>
-          </div>
-        </section>
-      </div>
 
-      {/* Connections */}
-      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">Connections</h3>
-          <span className="text-[11px] text-neutral-400">OAuth</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <GoogleButton />
-          <AppleButton />
-        </div>
-      </section>
+      {/* Fully Configurable Tuning Section */}
+      <section className="bg-[#0c0c10]/40 border border-white/5 rounded-2xl p-6 space-y-5">
+        <h3 className="font-['Syne'] text-base font-bold text-[#f0f0f5] mb-2 border-b border-white/5 pb-2">AI Routing & System Context</h3>
 
-      {/* Custom System Prompt */}
-      <section className="bg-neutral-800/60 backdrop-blur-sm rounded-xl p-5 border border-neutral-700/50 flex flex-col gap-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-neutral-200 uppercase tracking-wide">LLM Settings</h3>
-          <span className="text-[11px] text-neutral-400">AI Behavior</span>
-        </div>
         <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Model Selection</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full bg-neutral-700/40 text-neutral-100 border border-neutral-600/50 rounded-xl px-4 py-3 h-12 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500"
+          <label className="block text-xs uppercase tracking-widest text-[#7a7a8c] font-bold mb-2">Core Router Model</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {Object.entries(modelInfo).map(([key, details]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedModel(key)}
+                className={`text-left p-4 rounded-xl border transition-all duration-300 ${
+                  selectedModel === key 
+                    ? "border-[#3b82f6] bg-[rgba(59,130,246,0.04)] shadow-[0_0_15px_rgba(59,130,246,0.05)]" 
+                    : "border-white/5 bg-[#050507]/60 hover:border-white/10"
+                }`}
               >
-                <option value="gpt-5-mini">{modelInfo["gpt-5-mini"].label} — {modelInfo["gpt-5-mini"].cost} /1k</option>
-                <option value="gpt-5-nano">{modelInfo["gpt-5-nano"].label} — {modelInfo["gpt-5-nano"].cost} /1k</option>
-                <option value="gpt-4o-mini">{modelInfo["gpt-4o-mini"].label} — {modelInfo["gpt-4o-mini"].cost} /1k</option>
-                <option value="gpt-4-1-mini">{modelInfo["gpt-4-1-mini"].label} — {modelInfo["gpt-4-1-mini"].cost} /1k</option>
-              </select>
-              <p className="text-xs text-neutral-400 mt-1">Estimated token cost: {modelInfo[selectedModel].cost} per 1k tokens</p>
-              <p className="text-xs text-neutral-400 mt-1">Performance: {modelInfo[selectedModel].performance}</p>
-
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-semibold text-sm text-[#f0f0f5]">{details.label}</span>
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-[#3b82f6] bg-[rgba(59,130,246,0.06)] px-2 py-0.5 rounded-md border border-[rgba(59,130,246,0.15)]">
+                    {details.cost} / 1k
+                  </span>
+                </div>
+                <p className="text-xs text-[#7a7a8c] leading-relaxed font-light">{details.performance}</p>
+              </button>
+            ))}
           </div>
-        <div>
-              <label className="text-xs font-semibold text-neutral-300 mb-1 block">Custom System Prompt</label>
-        <textarea
-          onChange={(e) => setForm(f => ({ ...f, system_prompt: e.target.value }))}
-          value={form.system_prompt}
-          placeholder="E.g., You are an AI chatbot with ____ personality, specializing in _____ and _____."
-          className="w-full h-32 bg-neutral-700/40 text-neutral-100 border border-neutal-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-neutral-500 resize-none font-mono text-sm"
-        />
         </div>
-        <ResetDataButton />
+
+        <div>
+          <label className="block text-xs uppercase tracking-widest text-[#7a7a8c] font-bold mb-2">System Instructions Override</label>
+          <textarea
+            value={form.system_prompt}
+            rows={4}
+            onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
+            className="w-full bg-[#050507] border border-white/5 focus:border-[rgba(59,130,246,0.25)] rounded-xl px-4 py-3.5 text-sm text-[#f0f0f5] placeholder-[#7a7a8c] outline-none transition-colors resize-none font-light leading-relaxed"
+            placeholder="Instruct Prodigy on behavior profiles (e.g., 'You are a concise, security-first expert assistant...')"
+          />
+        </div>
       </section>
     </div>
   );
 }
-function GoogleButton () {
-  const { connectedToGoogle } = useGoogleConnection();
-  if (!connectedToGoogle) {
-    return (
-     <button
-        className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
-        type="button"
-        onClick={() => {
-            window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google/login`;
-        }}
-      >
-            <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              <path fill="#EA4335" d="M24 9.5c3.27 0 6.2 1.13 8.52 3.35l6.36-6.36C34.9 2.47 29.86 0 24 0 14.64 0 6.4 5.38 2.52 13.22l7.53 5.85C11.62 13.07 17.27 9.5 24 9.5z" 
-/>
-              <path fill="#4285F4" d="M46.5 24.5c0-1.57-.14-3.09-.39-4.55H24v9.02h12.7c-.55 2.97-2.2 5.49-4.69 7.18l7.36 5.71C43.78 38.24 46.5 31.88 46.5 24.5z" />
-              <path fill="#FBBC05" d="M10.05 28.07A14.5 14.5 0 019.5 24c0-1.4.24-2.76.55-4.07l-7.53-5.85A23.93 23.93 0 000 24c0 3.8.9 7.38 2.52 10.92l7.53-5.85z" />
-              <path fill="#34A853" d="M24 48c6.48 0 11.92-2.13 15.89-5.79l-7.36-5.71c-2.04 1.38-4.66 2.2-8.53 2.2-6.73 0-12.38-3.57-14.95-8.92l-7.53 5.85C6.4 42.62 14.64 48 24 48z" />
-              <path fill="none" d="M0 0h48v48H0z" />
-            </svg>
-            <span>Connect Google</span>
-          </button>);  }
-    else {
-      return (
-        <button
-      className="w-full py-3 px-4 rounded-xl border border-green-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
-      type="button"
-    >
-              <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#34A853" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.9
-5 20-20S35.05 4 24 4zm0 36c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16
- 16z" />
-                <path fill="#34A853" d="M34.59 15.41l-11.3 11.3-5.88-5.88a2 2 0 10-2.83
- 2.83l7.29 7.29a2 2 0 002.83 0l12.71-12.71a2 2 0 10-2.83-2.83z" />
-                <path fill="none" d="M0 0h48v48H0z" />
-              </svg>
-      <span>Google Connected</span>
-    </button>
-    )
-  }
-}
-function AppleButton() {
-  const [connectedToApple] = reactUseState(false);
-
-  if (!connectedToApple){
-    return (
-    <button
-            className="w-full py-3 px-4 rounded-xl border border-neutral-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
-            type="button"
-          >
-            <span>Connect Apple ID</span>
-          </button>
-    );
-  }
-  else {
-    return (
-      <button
-      className="w-full py-3 px-4 rounded-xl border border-green-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-neutral-50 font-semibold transition-all duration-200 shadow-sm hover:shadow-blue-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-neutral-900"
-      type="button"
-    >
-      <svg aria-hidden="true" className="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www
-.w3.org/2000/svg">
-                <path fill="#34A853" d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.9
-5 20-20S35.05 4 24 4zm0 36c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16
- 16z" />
-                <path fill="#34A853" d="M34.59 15.41l-11.3 11.3-5.88-5.88a2 2 0 10-2.83
- 2.83l7.29 7.29a2 2 0 002.83 0l12.71-12.71a2 2 0 10-2.83-2.83z" />
-                <path fill="none" d="M0 0h48v48H0z" />
-              </svg>
-      <span>Apple ID Connected</span>
-    </button>
-    )
-  }
-}
-function ResetDataButton() {
-
-  async function handleReset() {
-    const confirmed = window.confirm(
-      "WARNING: Are you sure you want to delete your chat history? This will remove chat history, personality as well as stored PDF documents. This is irreversible."
-    );
-    if (!confirmed) return;
-
-  }
-
-  return (
-    <button
-      className="w-full py-3 px-4 rounded-xl border border-red-700/60 bg-neutral-800/60 hover:bg-neutral-800/80 text-red-500 font-semibold transition-all duration-200 shadow-sm hover:shadow-red-500/20 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-neutral-900"
-      type="button"
-      onClick={handleReset}
-    >
-      <span>Reset All Data</span>
-    </button>
-  );
-}
-

@@ -78,28 +78,38 @@ def get_user_by_id(user_id):
 def update_user(user_id, data):
     conn = get_connection()
     cursor = conn.cursor()
+
     query = """
         UPDATE users
         SET display_name  = %s,
-            given_name    = %s,
-            family_name   = %s,
-            title         = %s,
-            location      = %s,
-            system_prompt = %s,
-            picture_url   = %s,
-            updated_at    = CURRENT_TIMESTAMP
+            email          = %s,
+            given_name     = %s,
+            family_name    = %s,
+            title          = %s,
+            location       = %s,
+            system_prompt  = %s,
+            picture_url    = %s,
+            tasks_number   = %s,
+            chats_number   = %s,
+            pdfs_number    = %s,
+            updated_at     = CURRENT_TIMESTAMP
         WHERE id = %s
     """
+
     cursor.execute(query, (
-        data["display_name"],
-        data["given_name"],
-        data["family_name"],
+        data.get("display_name"),
+        data.get("given_name"),
+        data.get("family_name"),
         data.get("title"),
         data.get("location"),
         data.get("system_prompt"),
         data.get("picture_url"),
+        data.get("tasks_number", 0),
+        data.get("chats_number", 0),
+        data.get("pdfs_number", 0),
         user_id
     ))
+
     conn.commit()
     conn.close()
 

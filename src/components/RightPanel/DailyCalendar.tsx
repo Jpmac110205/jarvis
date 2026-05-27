@@ -1,183 +1,109 @@
-import { useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useGoogleData } from "../../contexts/GoogleDataProvider.tsx";
 import { useGoogleConnection } from "../../contexts/GoogleConnectionProvider";
-import { useGoogleData } from "../../contexts/GoogleDataProvider";
-
-type AgendaItem = {
-  time: string;
-  event: string;
-};
-
-type TaskItem = {
-  title: string;
-  due?: string;
-  listTitle?: string;
-};
 
 export function DailyCalendar() {
   const { setConnectedToGoogle } = useGoogleConnection();
   const { todayAgenda: agenda, tasks, connected, loading } = useGoogleData();
 
-  // Sync the connected state to the old context
   useEffect(() => {
     setConnectedToGoogle(connected);
   }, [connected, setConnectedToGoogle]);
 
-  // OAuth redirect
   function connectGoogle() {
     window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google/login`;
   }
 
   if (loading) {
-    return <p className="text-neutral-400">Loading calendar…</p>;
+    return <p className="text-[11px] text-[#7a7a8c] uppercase tracking-widest p-4">Syncing...</p>;
   }
 
   return (
-    <>
-      <h2 className="text-base font-semibold mb-5 text-neutral-100 tracking-tight">
-        Today's Overview
-      </h2>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-pulse" />
+        <h2 className="font-['Syne'] text-[11px] font-bold uppercase tracking-[0.2em] text-[#f0f0f5]">
+          Today's Overview
+        </h2>
+      </div>
 
       <Reminders 
         connected={connected} 
         tasks={tasks}
         connectGoogle={connectGoogle} 
       />
-      <br />
+      
       <Calendar
         connected={connected}
         agenda={agenda}
         connectGoogle={connectGoogle}
       />
-    </>
+    </div>
   );
 }
 
-function Reminders({
-  connected,
-  tasks,
-  connectGoogle,
-}: {
-  connected: boolean;
-  tasks: TaskItem[];
-  connectGoogle: () => void;
-}) {
+function Reminders({ connected, tasks, connectGoogle }: { connected: boolean; tasks: any[]; connectGoogle: () => void; }) {
+  const CardBase = "w-full bg-[#0c0c10] rounded-[18px] p-5 border border-white/5 relative overflow-hidden transition-all duration-300 hover:border-[rgba(59,130,246,0.15)]";
+  
   if (!connected) {
     return (
-      <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
-        <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-          Reminders
-        </h3>
-        <p className="text-sm text-neutral-400 mb-4">
-          Connect your Google account to view reminders.
-        </p>
-        <button
-          onClick={connectGoogle}
-          className="text-sm px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Connect Google
-        </button>
-      </div>
-    );
-  }
-
-  if (tasks.length === 0) {
-    return (
-      <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
-        <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-          Reminders
-        </h3>
-        <p className="text-sm text-neutral-400 text-center">No tasks found.</p>
+      <div className={CardBase}>
+        <h3 className="text-[10px] font-bold text-[#3b82f6] uppercase tracking-widest mb-3">Reminders</h3>
+        <p className="text-xs text-[#7a7a8c] mb-4 font-light leading-relaxed">No cloud data available for local reminders node.</p>
+        <button onClick={connectGoogle} className="text-[10px] font-bold text-[#f0f0f5] uppercase tracking-widest bg-white/5 border border-white/10 px-4 py-2 rounded-lg hover:bg-white/10 transition-all">Link Node</button>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
-      <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-        Reminders ({tasks.length})
-      </h3>
-      <ul className="space-y-2">
-        {tasks.map((task, idx) => (
-          <li
-            key={idx}
-            className="flex items-start px-3 py-2.5 rounded-lg bg-neutral-700/40 border-l-4 border-blue-500/70"
-          >
-            <div className="flex-1">
-              <span className="text-sm font-medium text-neutral-100 block">
-                {task.title}
-              </span>
-              {task.listTitle && (
-                <span className="text-xs text-neutral-400 mt-1 block">
-                  {task.listTitle}
-                </span>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+    <div className={CardBase}>
+      <h3 className="text-[10px] font-bold text-[#3b82f6] uppercase tracking-widest mb-4">Reminders ({tasks.length})</h3>
+      {tasks.length === 0 ? (
+        <p className="text-xs text-[#7a7a8c] italic text-center py-4 font-light">Queue empty.</p>
+      ) : (
+        <ul className="space-y-2.5">
+          {tasks.slice(0, 3).map((task, idx) => (
+            <li key={idx} className="flex gap-3 items-center group">
+              <div className="w-1 h-1 rounded-full bg-[#3b82f6] group-hover:shadow-[0_0_5px_#3b82f6] transition-all" />
+              <div className="flex-1">
+                <span className="text-[13px] text-[#f0f0f5] font-light leading-none block">{task.title}</span>
+                {task.listTitle && <span className="text-[9px] text-[#7a7a8c] uppercase font-bold tracking-widest mt-1 block opacity-60">{task.listTitle}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function Calendar({
-  connected,
-  agenda,
-  connectGoogle,
-}: {
-  connected: boolean;
-  agenda: AgendaItem[];
-  connectGoogle: () => void;
-}) {
+function Calendar({ connected, agenda, connectGoogle }: { connected: boolean; agenda: any[]; connectGoogle: () => void; }) {
+  const CardBase = "w-full bg-[#0c0c10] rounded-[18px] p-5 border border-white/5 relative overflow-hidden transition-all duration-300 hover:border-[rgba(59,130,246,0.15)]";
+
   if (!connected) {
     return (
-      <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
-        <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-          Calendar
-        </h3>
-        <p className="text-sm text-neutral-400 mb-4">
-          Connect your Google account to view your calendar.
-        </p>
-        <button
-          onClick={connectGoogle}
-          className="text-sm px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Connect Google
-        </button>
-      </div>
-    );
-  }
-
-  if (agenda.length === 0) {
-    return (
-      <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
-        <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-          Schedule for Today
-        </h3>
-        <p className="text-sm text-neutral-400 text-center">
-          No events scheduled today.
-        </p>
+      <div className={CardBase}>
+        <h3 className="text-[10px] font-bold text-[#3b82f6] uppercase tracking-widest mb-3">Today's Schedule</h3>
+        <p className="text-xs text-[#7a7a8c] mb-4 font-light leading-relaxed">Calendar matrix disconnected.</p>
+        <button onClick={connectGoogle} className="text-[10px] font-bold text-[#f0f0f5] uppercase tracking-widest bg-white/5 border border-white/10 px-4 py-2 rounded-lg hover:bg-white/10 transition-all">Link Node</button>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-md bg-neutral-800/60 rounded-xl p-4 border border-neutral-700/50">
-      <h3 className="text-sm font-semibold text-neutral-200 mb-3 uppercase">
-        Schedule for Today ({agenda.length})
-      </h3>
-      <ul className="space-y-2">
-        {agenda.map((item, idx) => (
-          <li
-            key={idx}
-            className="flex justify-between items-center px-3 py-2.5 rounded-lg bg-neutral-700/40 border-l-4 border-blue-500/70"
-          >
-            <span className="text-sm font-medium text-blue-300">
-              {item.time}
-            </span>
-            <span className="text-sm font-medium">{item.event}</span>
-          </li>
-        ))}
-      </ul>
+    <div className={CardBase}>
+      <h3 className="text-[10px] font-bold text-[#3b82f6] uppercase tracking-widest mb-4">Agenda ({agenda.length})</h3>
+      {agenda.length === 0 ? (
+        <p className="text-xs text-[#7a7a8c] italic text-center py-4 font-light">No logged events for current cycle.</p>
+      ) : (
+        <ul className="space-y-3">
+          {agenda.map((item, idx) => (
+            <li key={idx} className="flex justify-between items-center border-b border-white/[0.03] pb-2 last:border-0 last:pb-0 group">
+              <span className="text-[10px] font-mono text-[#3b82f6] font-bold">{item.time}</span>
+              <span className="text-[13px] text-[#f0f0f5] font-light text-right group-hover:text-white transition-colors">{item.event}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
-  );
-}
+    )};

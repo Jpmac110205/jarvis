@@ -175,25 +175,69 @@ def create_system_message(user_data: dict = None, calendar_context: str = ""):
     
     
 dist_dir = os.path.join(os.path.dirname(__file__), "dist")
-app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
 
+app.mount(
+    "/app/assets",
+    StaticFiles(directory=os.path.join(dist_dir, "assets")),
+    name="assets"
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
+    name="static"
+)
+
+
+# ---------- LANDING PAGE ----------
 @app.get("/")
-def serve_landing():
-    landing = os.path.join(os.path.dirname(__file__), "static", "index.html")
+def serve_home():
+    landing = os.path.join(
+        os.path.dirname(__file__),
+        "static",
+        "index.html"
+    )
+
+    if not os.path.exists(landing):
+        raise HTTPException(
+            status_code=404,
+            detail="Landing page not found."
+        )
+
     return FileResponse(landing)
 
+
+# ---------- REACT APP ----------
 @app.get("/app")
-def serve_react():
+def serve_app():
     index_file = os.path.join(dist_dir, "index.html")
+
     if not os.path.exists(index_file):
-        raise HTTPException(status_code=404, detail="React build not found. Run `npm run build`")
+        raise HTTPException(
+            status_code=404,
+            detail="React build not found. Run npm run build."
+        )
+
     return FileResponse(index_file)
 
+
+# ---------- PRIVACY ----------
 @app.get("/privacy")
 def serve_privacy():
-    privacy = os.path.join(os.path.dirname(__file__), "static", "privacy.html")
+    privacy = os.path.join(
+        os.path.dirname(__file__),
+        "static",
+        "privacy.html"
+    )
+
+    if not os.path.exists(privacy):
+        raise HTTPException(
+            status_code=404,
+            detail="Privacy page not found."
+        )
+
     return FileResponse(privacy)
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+
 
 @app.get("/googleb6a142b0a0531b3b.html")
 def google_verify():
@@ -560,11 +604,10 @@ async def google_callback(request: Request):
         response.set_cookie(
             key="user_id",
             value=user_id,
-            httponly=False,  # Changed to False so JS can read it
-            secure=False,  # Allow localhost HTTP during development
-            samesite="lax",
+            httponly=False,
+            secure=True,
+            samesite="none",
             max_age=3600 * 24 * 7,
-            domain=None,  # Let browser handle domain
             path="/"
         )
         
@@ -732,21 +775,23 @@ async def auth_status(
         )
     existing_user = user_repository.get_user_by_google_id(user_id)
     return {
-    "authenticated": True,
-    "user": {
-        "id": existing_user["id"],
-        "email": profile.get("email"),
-        "name": existing_user.get("display_name") or profile.get("name"),
-        "picture_url": profile.get("picture"),
-        "title": existing_user.get("title"),
-        "location": existing_user.get("location"),
-        "created_at": existing_user["created_at"].isoformat() if existing_user and existing_user.get("created_at") else None,
-        "system_prompt": existing_user.get("system_prompt") or "",
-        "chats_number": existing_user.get("chats", 0) if existing_user else 0,
-        "tasks_number": existing_user.get("tasks", 0) if existing_user else 0,
-        "pdfs_number": existing_user.get("pdfs", 0) if existing_user else 0,    
+        "authenticated": True,
+        "user": {
+            "id": existing_user["id"],
+            "email": existing_user.get("email"),
+            "display_name": existing_user.get("display_name"),
+            "picture_url": existing_user.get("picture_url"),
+            "title": existing_user.get("title"),
+            "location": existing_user.get("location"),
+            "created_at": existing_user["created_at"].isoformat()
+                if existing_user.get("created_at")
+                else None,
+            "system_prompt": existing_user.get("system_prompt") or "",
+            "chats_number": existing_user.get("chats_number", 0),
+            "tasks_number": existing_user.get("tasks_number", 0),
+            "pdfs_number": existing_user.get("pdfs_number", 0),
+        }
     }
-}
 
 
 @app.post("/auth/logout")
@@ -764,7 +809,10 @@ async def logout(user_id: Optional[str] = Cookie(None)):
 #Post endpoint to create a user in the database
 @app.post("/users")
 def create_user(user: UserCreate):
-    user_repository.create_user(user)
+    user_repository.create_user(
+        user=user,
+        google_id=user.email
+    )
     return {"message": "User created"}
 
 #Get users endpoint to retrieve all users from the database
@@ -781,19 +829,24 @@ class UserUpdate(BaseModel):
     title: Optional[str] = None
     location: Optional[str] = None
     system_prompt: Optional[str] = None
+    tasks_number: Optional[int] = 0
+    chats_number: Optional[int] = 0
+    pdfs_number: Optional[int] = 0
+    picture_url: Optional[str] = None
 @app.put("/users/{user_id}")
 def update_user(user_id: int, user: UserUpdate):
     user_repository.update_user(user_id, {
         "display_name": user.name,
+        "email": user.email,
         "given_name": user.name.split(" ")[0] if user.name else "",
         "family_name": " ".join(user.name.split(" ")[1:]) if user.name and len(user.name.split(" ")) > 1 else "",
         "title": user.title,
         "location": user.location,
         "system_prompt": user.system_prompt,
-        "tasks": user.tasks_number,
-        "chats": user.chats_number,
-        "pdfs": user.pdfs_number,
-        "picture_url": user.picture_url if user.picture_url else None
+        "tasks_number": user.tasks_number,
+        "chats_number": user.chats_number,
+        "pdfs_number": user.pdfs_number,
+        "picture_url": user.picture_url
     })
     updated = user_repository.get_user_by_id(user_id)
     if not updated:
