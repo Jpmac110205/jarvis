@@ -213,12 +213,7 @@ export function SettingsPanel() {
             Clear now
           </button>
         </div>
-        <button
-          onClick={() => window.open("https://docs.google.com/document/d/e/2PACX-1vRNCM7fMJ_IZc6fmN-d4EHUMLLroW9dvjqNbeQnVpPR1agEabZASjKCYFgd69OQpQ/pub", "_blank")}
-          className="w-full px-4 py-3 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20 transition-all font-medium"
-        >
-          Privacy Policy
-        </button>
+
       </section>
     </div>
   );

@@ -11,11 +11,11 @@ export function LeftPanel({
   const active = "bg-gradient-to-r from-blue-600/20 to-blue-500/10 text-white border border-blue-500/30 shadow-lg shadow-blue-500/10";
 
   return (
-    <aside className="min-h-screen w-64 bg-neutral-900/40 backdrop-blur-xl border-r border-neutral-800/50 p-5 shadow-2xl">
+    <aside className="min-h-screen w-64 bg-neutral-900/40 backdrop-blur-xl border-r border-neutral-800/50 p-5 shadow-2xl flex flex-col">
       <h2 className="text-xs uppercase tracking-wider text-neutral-500 mb-6 font-semibold">
         Workspace
       </h2>
-      <ul className="space-y-2 text-sm">
+      <ul className="space-y-2 text-sm flex-1">
         <button
           className={`${base} ${middle === "profile" ? active : inactive} flex items-center h-11`}
           onClick={() => onSelect("profile")}
@@ -89,6 +89,13 @@ export function LeftPanel({
           <span className="font-medium">Settings</span>
         </button> */}
       </ul>
+      <button
+        onClick={() => window.open("https://docs.google.com/document/d/e/2PACX-1vRNCM7fMJ_IZc6fmN-d4EHUMLLroW9dvjqNbeQnVpPR1agEabZASjKCYFgd69OQpQ/pub", "_blank")}
+        className="mt-6 w-full px-4 py-3 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20 transition-all font-medium"
+      >
+        Privacy Policy
+      </button>
     </aside>
+    
   );
 }
