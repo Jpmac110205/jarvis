@@ -21,3 +21,5 @@ pypdf
 tiktoken
 pydantic
 aiohttp
+psycopg2-binary
+psycopg2
