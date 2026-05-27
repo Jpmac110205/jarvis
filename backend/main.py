@@ -39,6 +39,9 @@ from storage.memory_manager import (
     demote_stale_memories
 )
 
+import traceback
+import sys
+
 
 
 
@@ -828,8 +831,11 @@ async def upload_file(
     return {"filename": file.filename, "status": "ingested", "doc_type": doc_type}
 
 # ==================== RUN SERVER ====================
+
 if __name__ == "__main__":
     import uvicorn
-    # Read PORT from environment with a sensible default
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=port, log_level="info")
+    try:
+        uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    except Exception as e:
+        traceback.print_exc()
+        sys.exit(1)

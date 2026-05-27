@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from langchain_chroma import Chroma
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_community.embeddings import OpenAIEmbeddings
 import sqlite3
 
