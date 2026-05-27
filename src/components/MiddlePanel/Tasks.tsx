@@ -1,6 +1,5 @@
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useGoogleData } from "../../contexts/GoogleDataProvider.tsx";
-import { useGoogleConnection } from "../../contexts/GoogleConnectionProvider";
 
 export interface Task {
   id: string | number;

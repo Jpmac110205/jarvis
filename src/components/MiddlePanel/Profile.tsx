@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 export function ProfilePanel() {
   const [user, setUser] = useState<any>(null);
@@ -78,7 +78,6 @@ export function ProfilePanel() {
         console.log("Saved user:", data);
 
         setUser(data);
-        const updatedName = data.display_name || data.name || data.displayName || "";
         setForm({
             name: data.display_name || "",
             email: data.email || "",
