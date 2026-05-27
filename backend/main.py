@@ -62,6 +62,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-User-ID"],
     )
 
+user_repository.create_table()
 # ==================== GLOBAL STATE ====================
 current_results = {
     "chat_history": [],  # Will store conversation history

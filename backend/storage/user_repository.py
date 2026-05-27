@@ -1,12 +1,19 @@
-import psycopg
-from psycopg.rows import dict_row
-import dotenv
 import os
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
 
-dotenv.load_dotenv()
+
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(backend_dir, '.env'))
+print("DATABASE_URL loaded:", bool(os.getenv("DATABASE_URL")))
+
 
 def get_connection():
-    return psycopg.connect(os.getenv("DATABASE_URL"), row_factory=dict_row)
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL not set — check your .env file")
+    return psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
 
 # ==================== TABLE SETUP ====================
 def create_table():
@@ -76,7 +83,7 @@ def get_user_by_id(user_id):
 
 # ==================== UPDATE ====================
 def update_user(user_id, data):
-    conn = get_connection()
+    conn = get_connection()        
     cursor = conn.cursor()
 
     query = """
@@ -95,23 +102,29 @@ def update_user(user_id, data):
             updated_at     = CURRENT_TIMESTAMP
         WHERE id = %s
     """
-
-    cursor.execute(query, (
-        data.get("display_name"),
-        data.get("given_name"),
-        data.get("family_name"),
-        data.get("title"),
-        data.get("location"),
-        data.get("system_prompt"),
-        data.get("picture_url"),
-        data.get("tasks_number", 0),
-        data.get("chats_number", 0),
-        data.get("pdfs_number", 0),
-        user_id
-    ))
-
-    conn.commit()
-    conn.close()
+    try: 
+        cursor.execute(query, (
+            data.get("display_name"),
+            data.get("email"),
+            data.get("given_name"),
+            data.get("family_name"),
+            data.get("title"),
+            data.get("location"),
+            data.get("system_prompt"),
+            data.get("picture_url"),
+            data.get("tasks_number", 0),
+            data.get("chats_number", 0),
+            data.get("pdfs_number", 0),
+            user_id
+        ))
+        print(f"[UserRepository] Updated user {user_id} with data: {data}")
+        conn.commit()
+    except Exception as e:
+        print(f"[UserRepository] Error updating user {user_id}: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 # ==================== INITIALIZE ====================
 if __name__ == "__main__":
