@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Prodigy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;1,9..40,300&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050507;
+      --surface: #0c0c10;
+      --blue: #3b82f6;
+      --blue-faint: rgba(59,130,246,0.07);
+      --white: #f0f0f5;
+      --muted: #7a7a8c;
+      --border: rgba(59,130,246,0.15);
+      --border-subtle: rgba(255,255,255,0.05);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 20px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(5,5,7,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.2rem;
+      letter-spacing: 0.08em;
+      color: var(--white);
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--blue); }
+
+    .nav-back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s;
+    }
+    .nav-back:hover { color: var(--white); }
+    .nav-back svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* LAYOUT */
+    .page-wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 140px 24px 100px;
+    }
+
+    /* HEADER */
+    .page-header {
+      margin-bottom: 64px;
+      padding-bottom: 40px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .page-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 16px;
+    }
+
+    .page-header h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+
+    .page-header h1 span { color: var(--blue); }
+
+    .meta-row {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .meta-item {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-item::before {
+      content: '';
+      width: 4px; height: 4px;
+      background: var(--blue);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* TOC */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin-bottom: 56px;
+    }
+
+    .toc-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .toc ol {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+    }
+
+    .toc li a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .toc li a:hover { color: var(--blue); }
+
+    .toc-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--blue);
+      opacity: 0.6;
+      min-width: 16px;
+    }
+
+    /* SECTIONS */
+    .section {
+      margin-bottom: 52px;
+      padding-bottom: 52px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .section:last-of-type {
+      border-bottom: none;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .section-num {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: var(--blue);
+      opacity: 0.7;
+      min-width: 20px;
+    }
+
+    .section h2 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: -0.01em;
+      color: var(--white);
+    }
+
+    .section p {
+      color: #c8c8d4;
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+    }
+
+    .section p:last-child { margin-bottom: 0; }
+
+    /* Subsections */
+    .subsection {
+      margin-top: 24px;
+      padding: 20px 24px;
+      background: var(--blue-faint);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .subsection h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+
+    .subsection p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 0;
+    }
+
+    /* Third party list */
+    .third-party-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .third-party-item {
+      display: flex;
+      gap: 14px;
+      padding: 16px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      align-items: flex-start;
+    }
+
+    .third-party-item:hover {
+      border-color: var(--border);
+    }
+
+    .tp-badge {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--blue);
+      background: var(--blue-faint);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .tp-body p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 0;
+    }
+
+    .tp-body strong {
+      color: var(--white);
+      font-weight: 400;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .tp-body a {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+
+    .tp-body a:hover { text-decoration: underline; }
+
+    /* Rights list */
+    .rights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .right-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: #c8c8d4;
+    }
+
+    .right-dot {
+      width: 6px; height: 6px;
+      background: var(--blue);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Callout box */
+    .callout {
+      margin-top: 20px;
+      padding: 18px 22px;
+      border-left: 2px solid var(--blue);
+      background: var(--blue-faint);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .callout p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin: 0;
+      font-style: italic;
+    }
+
+    /* Footer */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 36px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    footer .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: 0.06em;
+      color: var(--white);
+    }
+
+    footer .logo span { color: var(--blue); }
+    footer p { color: var(--muted); font-size: 0.8rem; }
+
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      transition: color 0.2s;
+    }
+
+    footer a:hover { color: var(--blue); }
+
+    /* Animations */
+    .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 640px) {
+      nav { padding: 16px 20px; }
+      .page-wrap { padding: 120px 20px 80px; }
+      .toc ol { grid-template-columns: 1fr; }
+      footer { padding: 28px 20px; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-logo">PRODIGY<span>.</span></a>
+    <a href="/" class="nav-back">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to home
+    </a>
+  </nav>
+
+  <div class="page-wrap">
+
+    <!-- Header -->
+    <div class="page-header reveal">
+      <p class="page-label">Legal</p>
+      <h1>Privacy <span>Policy</span></h1>
+      <div class="meta-row">
+        <span class="meta-item">Effective: May 27, 2025</span>
+        <span class="meta-item">Last updated: May 27, 2025</span>
+        <span class="meta-item">Applies to: Prodigy Personal AI Assistant</span>
+      </div>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc reveal">
+      <p class="toc-title">Contents</p>
+      <ol>
+        <li><a href="#overview"><span class="toc-num">01</span>Overview</a></li>
+        <li><a href="#data-collected"><span class="toc-num">02</span>Information we collect</a></li>
+        <li><a href="#how-used"><span class="toc-num">03</span>How we use your information</a></li>
+        <li><a href="#third-party"><span class="toc-num">04</span>Third-party services</a></li>
+        <li><a href="#storage"><span class="toc-num">05</span>Data storage &amp; security</a></li>
+        <li><a href="#sharing"><span class="toc-num">06</span>Data sharing</a></li>
+        <li><a href="#retention"><span class="toc-num">07</span>Data retention</a></li>
+        <li><a href="#rights"><span class="toc-num">08</span>Your rights</a></li>
+        <li><a href="#children"><span class="toc-num">09</span>Children's privacy</a></li>
+        <li><a href="#contact"><span class="toc-num">10</span>Contact</a></li>
+        <li><a href="#changes"><span class="toc-num">11</span>Changes to this policy</a></li>
+      </ol>
+    </div>
+
+    <!-- 1. Overview -->
+    <div class="section reveal" id="overview">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <h2>Overview</h2>
+      </div>
+      <p>Prodigy (also referred to as "JARVIS") is a personal AI assistant built and operated by an individual developer as a private project. This Privacy Policy describes how Prodigy collects, uses, and stores your information when you use the application.</p>
+      <p>By signing in and using Prodigy, you agree to the practices described in this policy.</p>
+    </div>
+
+    <!-- 2. Information collected -->
+    <div class="section reveal" id="data-collected">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <h2>Information we collect</h2>
+      </div>
+      <p>Prodigy collects only what is necessary to provide its functionality. Below is a breakdown of each data type.</p>
+
+      <div class="subsection">
+        <h3>Google account information</h3>
+        <p>When you sign in with Google, Prodigy collects your name, email address, and profile picture as provided by Google OAuth. This is stored in a local SQL database and used to personalize your experience and associate your data with your account.</p>
+      </div>
+
+      <div class="subsection">
+        <h3>Documents and files</h3>
+        <p>You may upload PDFs and notes. These are parsed, chunked, and stored as vector embeddings in a ChromaDB vector database. File content may be retained to support accurate retrieval and question-answering.</p>
+      </div>
+
+      <div class="subsection">
+        <h3>Conversation data</h3>
+        <p>Prodigy stores your conversation history to support persistent memory across sessions. This includes messages you send and AI-generated responses. Conversation summaries may also be stored in the vector database to support long-term memory retrieval.</p>
+      </div>
+
+      <div class="subsection">
+        <h3>Google Calendar data</h3>
+        <p>With your explicit authorization via Google OAuth, Prodigy may read your upcoming calendar events to provide schedule-aware responses. This data is used only to answer your queries and is not stored permanently beyond the active session context.</p>
+      </div>
+
+      <div class="subsection">
+        <h3>Profile and preferences</h3>
+        <p>Information you enter on your profile page — such as your title, location, or a custom system prompt — is stored in the SQL database and used to personalize the AI's behavior for your account.</p>
+      </div>
+    </div>
+
+    <!-- 3. How used -->
+    <div class="section reveal" id="how-used">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <h2>How we use your information</h2>
+      </div>
+      <p>Your data is used solely to provide and improve Prodigy's core functionality:</p>
+      <div class="rights-list">
+        <div class="right-item"><span class="right-dot"></span>Authenticate you and associate your data with your account</div>
+        <div class="right-item"><span class="right-dot"></span>Answer questions using your personal documents and notes via RAG</div>
+        <div class="right-item"><span class="right-dot"></span>Maintain conversational memory across sessions</div>
+        <div class="right-item"><span class="right-dot"></span>Provide schedule-aware responses using your calendar</div>
+        <div class="right-item"><span class="right-dot"></span>Personalize the AI's responses based on your profile settings</div>
+        <div class="right-item"><span class="right-dot"></span>Route queries to web search when real-time information is needed</div>
+      </div>
+    </div>
+
+    <!-- 4. Third party -->
+    <div class="section reveal" id="third-party">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <h2>Third-party services</h2>
+      </div>
+      <p>Prodigy integrates with the following third-party services to operate. Each is governed by its own privacy policy.</p>
+      <div class="third-party-list">
+        <div class="third-party-item">
+          <span class="tp-badge">OpenAI</span>
+          <div class="tp-body">
+            <strong>OpenAI API</strong>
+            <p>Your messages and document content are sent to OpenAI's API to generate responses and create embeddings. This is subject to OpenAI's data usage policies.</p>
+            <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">openai.com/policies/privacy-policy ↗</a>
+          </div>
+        </div>
+        <div class="third-party-item">
+          <span class="tp-badge">Google</span>
+          <div class="tp-body">
+            <strong>Google OAuth &amp; Calendar API</strong>
+            <p>Sign-in and calendar access are handled by Google's OAuth 2.0 service and governed by Google's Privacy Policy.</p>
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy ↗</a>
+          </div>
+        </div>
+        <div class="third-party-item">
+          <span class="tp-badge">Search</span>
+          <div class="tp-body">
+            <strong>Web Search (Brave / Tavily)</strong>
+            <p>When a query requires real-time information, it may be forwarded to a third-party search API. No personally identifiable information is included in these requests.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Storage -->
+    <div class="section reveal" id="storage">
+      <div class="section-header">
+        <span class="section-num">05</span>
+        <h2>Data storage &amp; security</h2>
+      </div>
+      <p>Your data is stored locally or on a private server controlled by the developer. Vector embeddings are stored in ChromaDB. User account and conversation data are stored in a SQL database.</p>
+      <div class="callout">
+        <p>Prodigy is a personal project and is not designed or certified for storing sensitive, confidential, or regulated information. You use this application at your own discretion.</p>
+      </div>
+    </div>
+
+    <!-- 6. Sharing -->
+    <div class="section reveal" id="sharing">
+      <div class="section-header">
+        <span class="section-num">06</span>
+        <h2>Data sharing</h2>
+      </div>
+      <p>Your data is not sold, rented, or shared with any third parties for advertising or commercial purposes. Data is only transmitted to the services listed in Section 4 as strictly necessary to operate the application.</p>
+    </div>
+
+    <!-- 7. Retention -->
+    <div class="section reveal" id="retention">
+      <div class="section-header">
+        <span class="section-num">07</span>
+        <h2>Data retention</h2>
+      </div>
+      <p>Your data is retained for as long as you maintain an account on Prodigy. Upon request, all stored data associated with your account — including documents, conversation history, and profile information — will be permanently removed. Contact the developer to request deletion (see Section 10).</p>
+    </div>
+
+    <!-- 8. Rights -->
+    <div class="section reveal" id="rights">
+      <div class="section-header">
+        <span class="section-num">08</span>
+        <h2>Your rights</h2>
+      </div>
+      <p>You have the right to:</p>
+      <div class="rights-list">
+        <div class="right-item"><span class="right-dot"></span>Access the data stored about you</div>
+        <div class="right-item"><span class="right-dot"></span>Request correction of inaccurate data</div>
+        <div class="right-item"><span class="right-dot"></span>Request permanent deletion of your account and all associated data</div>
+        <div class="right-item"><span class="right-dot"></span>Revoke Google OAuth permissions at any time via your Google Account settings</div>
+      </div>
+      <div class="callout" style="margin-top: 20px;">
+        <p>To revoke Google permissions independently of this app, visit <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener" style="color: var(--blue);">myaccount.google.com/permissions</a></p>
+      </div>
+    </div>
+
+    <!-- 9. Children -->
+    <div class="section reveal" id="children">
+      <div class="section-header">
+        <span class="section-num">09</span>
+        <h2>Children's privacy</h2>
+      </div>
+      <p>Prodigy is not intended for use by individuals under the age of 13. No data is knowingly collected from children. If you believe a minor has used this application and provided personal data, please contact the developer for immediate removal.</p>
+    </div>
+
+    <!-- 10. Contact -->
+    <div class="section reveal" id="contact">
+      <div class="section-header">
+        <span class="section-num">10</span>
+        <h2>Contact</h2>
+      </div>
+      <p>Prodigy is a personal project. If you have questions about this Privacy Policy, wish to exercise your data rights, or need to request account deletion, please contact the developer directly via the contact method provided upon your access to the application.</p>
+    </div>
+
+    <!-- 11. Changes -->
+    <div class="section reveal" id="changes">
+      <div class="section-header">
+        <span class="section-num">11</span>
+        <h2>Changes to this policy</h2>
+      </div>
+      <p>This Privacy Policy may be updated from time to time. The "Last Updated" date at the top of this page reflects the most recent revision. Continued use of Prodigy after changes are posted constitutes acceptance of the updated policy.</p>
+      <div class="callout">
+        <p>Prodigy is an independent personal project and is not affiliated with or endorsed by OpenAI, Google, or any other third-party service mentioned herein.</p>
+      </div>
+    </div>
+
+  </div><!-- /page-wrap -->
+
+  <footer>
+    <div class="logo">PRODIGY<span>.</span></div>
+    <p>Personal AI Assistant — built for one person, by one person.</p>
+    <a href="/">← Back to home</a>
+  </footer>
+
+  <script>
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => entry.target.classList.add('visible'), i * 80);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08 });
+    reveals.forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
