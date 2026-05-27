@@ -16,3 +16,14 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE memories (
+    id            SERIAL PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    content       TEXT NOT NULL,          -- the summary text
+    embedding_id  TEXT NOT NULL,          -- reference to ChromaDB vector
+    tier          TEXT DEFAULT 'short',   -- 'short' or 'long'
+    frequency     INT DEFAULT 1,          -- how many times accessed
+    last_accessed TIMESTAMP DEFAULT NOW(),
+    created_at    TIMESTAMP DEFAULT NOW()
+);

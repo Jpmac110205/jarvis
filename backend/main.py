@@ -30,6 +30,14 @@ from storage import user_repository
 from ingestion_pipeline import load_document, split_documents, create_vector_store
 from retrieval_pipeline import embedding_model, db
 import tempfile
+import sqlite3
+
+from storage.memory_manager import (
+    get_conversational_context,
+    retrieve_memory,
+    store_memory,
+    demote_stale_memories
+)
 
 
 
@@ -256,6 +264,10 @@ def embed_on_upload(file_path: str, doc_type: str = "default"):
     create_vector_store(chunks)
     print(f"[Ingest] {file_path} ingested successfully.")
 
+def get_db_conn():
+    conn = sqlite3.connect("db/memory.db")
+    return conn
+
 @app.post("/chat")
 async def chat(request: Request):
     try:
@@ -268,6 +280,7 @@ async def chat(request: Request):
 
         user_profile = None
         calendar_context = ""
+        conn = get_db_conn()
 
         if user_id:
             db_user = user_repository.get_user_by_google_id(user_id)
@@ -290,47 +303,75 @@ async def chat(request: Request):
                     except Exception as e:
                         print(f"Failed to fetch Google data for chat: {e}")
 
+        # ==================== MEMORY HIERARCHY ====================
+        memory_context = ""
+        if user_id:
+            memory_result = retrieve_memory(user_message, user_id, conn)
+            if memory_result["context"]:
+                tier_label = "Recent Memory" if memory_result["tier"] == "short_term" else "Past Memory"
+                memory_context = f"\n\n=== {tier_label} ===\n{memory_result['context']}"
+                print(f"[Memory] Hit from {memory_result['tier']}")
 
         # ==================== ROUTING ====================
         route = classify_query(user_message)
-        context_block = ""
+        
+        # Memory context is always the base — RAG/WEB appends on top
+        context_block = memory_context
 
         if route == "RAG":
             try:
                 query_embedding = embedding_model.embed_query(user_message)
                 rag_results = db.similarity_search_by_vector(query_embedding, k=4)
                 if rag_results:
-                    context_block = "\n\n=== Retrieved Context From Your Documents ===\n"
+                    context_block += "\n\n=== Retrieved Context From Your Documents ===\n"
                     context_block += "\n---\n".join([
                         f"[{doc.metadata.get('source', 'unknown')}]\n{doc.page_content}"
                         for doc in rag_results
                     ])
                 else:
-                    context_block = "\n\n[RAG attempted but no relevant documents found. Answering from general knowledge.]"
+                    context_block += "\n\n[RAG attempted but no relevant documents found. Answering from general knowledge.]"
             except Exception as e:
                 print(f"[RAG] Retrieval failed: {e}")
-                context_block = "\n\n[Document retrieval failed. Answering from general knowledge.]"
+                context_block += "\n\n[Document retrieval failed. Answering from general knowledge.]"
 
         elif route == "WEB":
-            # Placeholder until you wire in Brave/Tavily
-            context_block = "\n\n[Web search not yet implemented. Answering from general knowledge — this answer may be outdated.]"
-
-        # Append context to the user message so the model sees it
-        augmented_message = user_message
-        if context_block:
-            augmented_message = f"{user_message}\n{context_block}"
+            context_block += "\n\n[Web search not yet implemented. Answering from general knowledge — this answer may be outdated.]"
 
         # ==================== INVOKE ====================
+        augmented_message = f"{user_message}\n{context_block}" if context_block else user_message
+
         messages = (
             [create_system_message(user_profile, calendar_context)]
-            + current_results["chat_history"]
+            + current_results["chat_history"][-10:]  # layer 1 — last 10 only
             + [HumanMessage(content=augmented_message)]
         )
+
         response = model.invoke(messages)
         response_text = response.content
 
         current_results["chat_history"].append(HumanMessage(content=user_message))
         current_results["chat_history"].append(AIMessage(content=response_text))
+
+        # ==================== SUMMARIZE EVERY 20 TURNS ====================
+        if user_id and len(current_results["chat_history"]) % 20 == 0:
+            try:
+                history_text = "\n".join([
+                    f"{'User' if isinstance(m, HumanMessage) else 'Prodigy'}: {m.content}"
+                    for m in current_results["chat_history"][-20:]
+                ])
+                summary_response = model.invoke([
+                    SystemMessage(content="""Summarize this conversation into 3-5 sentences.
+                    Focus on: topics discussed, decisions made, key facts about the user.
+                    Write it as a memory note, not a transcript."""),
+                    HumanMessage(content=history_text)
+                ])
+                import uuid
+                embedding_id = str(uuid.uuid4())
+                store_memory(summary_response.content, user_id, conn, embedding_id)
+                demote_stale_memories(conn)
+                print(f"[Memory] Summarized and stored conversation for user {user_id}")
+            except Exception as e:
+                print(f"[Memory] Summarization failed: {e}")
 
         return {"reply": response_text, "route": route, "error": None}
 
@@ -339,6 +380,10 @@ async def chat(request: Request):
         import traceback
         traceback.print_exc()
         return {"reply": "An error occurred while processing your message. Please try again.", "error": str(e)}
+    
+    finally:
+        # Always close the connection whether or not an exception occurred
+        conn.close()
 
 
 @app.post("/export/conversation")
@@ -648,7 +693,7 @@ async def auth_status(
     user_data = user_tokens[user_id]
     profile = user_data["profile"]
 
-    # 🔥 Check if user exists in DB
+    # Check if user exists in DB
     existing_user = user_repository.get_user_by_google_id(user_id)
 
     if not existing_user:

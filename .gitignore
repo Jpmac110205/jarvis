@@ -30,3 +30,7 @@ app.db
 backend/dist/
 backend/uploaded_docs/*
 !backend/uploaded_docs/.gitkeep
+db/chroma_db/
+db/chroma_short_term/
+db/chroma_long_term/
+db/memory.db
