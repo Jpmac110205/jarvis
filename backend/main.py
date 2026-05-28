@@ -497,7 +497,7 @@ async def google_login():
         "email",
         "profile",
         "https://www.googleapis.com/auth/calendar.readonly",
-        "https://www.googleapis.com/auth/tasks"
+        "https://www.googleapis.com/auth/tasks.readonly"
     ]
 
     scope_string = " ".join(scopes)

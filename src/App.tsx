@@ -8,7 +8,6 @@ import { ProfilePanel } from "./components/MiddlePanel/Profile";
 import { ShortcutsPanel } from "./components/RightPanel/Shortcuts";
 import { DailyCalendar } from "./components/RightPanel/DailyCalendar";
 import { sendChatMessage } from "./services/api";
-import ProdigyLanding from "./components/home/home";
 import PrivacyPolicy from "./components/home/privacy";
 
 export interface Message {
@@ -282,12 +281,6 @@ function MiddlePanel({
   isTyping: boolean;
 }) {
   switch (middle) {
-    case "home":
-      return (
-        <div className="w-full h-full overflow-y-auto scrollbar-thin">
-          <ProdigyLanding />
-        </div>
-      );
 
     case "privacy":
       return (
