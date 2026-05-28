@@ -19,15 +19,17 @@ export async function sendChatMessage(
 ): Promise<ChatResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message,
-        history,
-      }),
-    });
+  method: "POST",
+  credentials: "include",  // ← send cookie
+  headers: {
+    "Content-Type": "application/json",
+    "X-User-ID": localStorage.getItem("user_id") ?? "",  // ← send user_id
+  },
+  body: JSON.stringify({
+    message,
+    history,
+  }),
+});
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
