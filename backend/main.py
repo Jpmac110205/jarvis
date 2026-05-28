@@ -601,13 +601,16 @@ async def google_callback(request: Request):
 
         # Redirect to frontend with success and user_id in URL
         # This helps with cookie issues when using ngrok
+        
+        is_production = os.getenv("ENVIRONMENT") == "production"
+
         response = RedirectResponse(f"{FRONTEND_URL}?auth=success&user_id={user_id}")
         response.set_cookie(
             key="user_id",
             value=user_id,
             httponly=False,
-            secure=True,
-            samesite="none",
+            secure=is_production,
+            samesite="none" if is_production else "lax",
             max_age=3600 * 24 * 7,
             path="/"
         )
