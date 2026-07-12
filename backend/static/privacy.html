@@ -459,6 +459,10 @@
         <h3>Google account information</h3>
         <p>When you sign in with Google, Prodigy collects your name, email address, and profile picture as provided by Google OAuth. This is stored in a local SQL database and used to personalize your experience and associate your data with your account.</p>
       </div>
+      <div class="subsection">
+  <h3>Google Tasks data</h3>
+  <p>With your explicit authorization via Google OAuth, Prodigy may read your pending Google Tasks to reference your to-do items in responses. This data is used only to answer your queries and is not stored permanently beyond the active session context.</p>
+</div>
 
       <div class="subsection">
         <h3>Documents and files</h3>
@@ -489,6 +493,7 @@
       </div>
       <p>Your data is used solely to provide and improve Prodigy's core functionality:</p>
       <div class="rights-list">
+        <div class="right-item"><span class="right-dot"></span>Provide task-aware responses using your Google Tasks</div>
         <div class="right-item"><span class="right-dot"></span>Authenticate you and associate your data with your account</div>
         <div class="right-item"><span class="right-dot"></span>Answer questions using your personal documents and notes via RAG</div>
         <div class="right-item"><span class="right-dot"></span>Maintain conversational memory across sessions</div>
@@ -520,7 +525,10 @@
             <strong>Google OAuth &amp; Calendar API</strong>
             <p>Sign-in and calendar access are handled by Google's OAuth 2.0 service and governed by Google's Privacy Policy.</p>
             <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy ↗</a>
+            <strong>Google OAuth, Calendar &amp; Tasks API</strong>
+<p>Sign-in, calendar access, and task access are handled by Google's OAuth 2.0 service and governed by Google's Privacy Policy.</p>
           </div>
+          
         </div>
         <div class="third-party-item">
           <span class="tp-badge">Search</span>

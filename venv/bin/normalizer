@@ -1,4 +1,6 @@
-#!/Users/jpmac1102/Desktop/prodigy/venv/bin/python
+#!/bin/sh
+'''exec' "/Users/jpmac1102/Desktop/Visual Studio Projects/prodigy/venv/bin/python3.14" "$0" "$@"
+' '''
 import sys
 from charset_normalizer.cli import cli_detect
 if __name__ == '__main__':
