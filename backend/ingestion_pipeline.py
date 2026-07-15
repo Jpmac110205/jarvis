@@ -1,4 +1,5 @@
 import os
+import chromadb
 from langchain_community.document_loaders import TextLoader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
@@ -6,6 +7,13 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from dotenv import load_dotenv
 load_dotenv()
+
+# Chroma Cloud client — shared connection config
+chroma_client = chromadb.CloudClient(
+    api_key=os.getenv("CHROMA_API_KEY"),
+    tenant=os.getenv("CHROMA_TENANT"),
+    database=os.getenv("CHROMA_DATABASE"),
+)
 
 
 def load_document(file_path):
@@ -26,11 +34,6 @@ def load_document(file_path):
 
 
 def get_chunk_params(total_chars: int, doc_type: str) -> tuple[int, int]:
-    """
-    Determine chunk_size and chunk_overlap based on document size and type.
-    Overlap is always ~15-20% of chunk_size.
-    """
-    # --- Size-based scaling ---
     if total_chars < 5_000:
         chunk_size = 300
         chunk_overlap = 60
@@ -47,25 +50,19 @@ def get_chunk_params(total_chars: int, doc_type: str) -> tuple[int, int]:
         chunk_size = 4_000
         chunk_overlap = 600
 
-    # --- Doc type overrides: shift chunk size up or down ---
     if doc_type == "dense":
-        # Research papers — keep chunks small so each stays focused
         chunk_size = int(chunk_size * 0.75)
         chunk_overlap = int(chunk_overlap * 0.75)
     elif doc_type == "notes":
-        # Lecture notes — looser structure, slightly larger chunks are fine
         chunk_size = int(chunk_size * 1.15)
         chunk_overlap = int(chunk_overlap * 1.15)
-    # "default" → no adjustment
 
     print(f"[Chunker] doc_type={doc_type} | chars={total_chars:,} → chunk_size={chunk_size}, overlap={chunk_overlap}")
     return chunk_size, chunk_overlap
 
 
 def split_documents(documents, doc_type: str = "default", filename: str = "unknown", user_id: str = None):
-    # Measure total document size to drive variable chunking
     total_chars = sum(len(doc.page_content) for doc in documents)
-
     chunk_size, chunk_overlap = get_chunk_params(total_chars, doc_type)
 
     splitter = RecursiveCharacterTextSplitter(
@@ -77,7 +74,6 @@ def split_documents(documents, doc_type: str = "default", filename: str = "unkno
 
     chunks = splitter.split_documents(documents)
 
-    # Enrich every chunk with metadata for citation and debugging
     for i, chunk in enumerate(chunks):
         chunk.metadata.update({
             "source":        filename,
@@ -90,12 +86,12 @@ def split_documents(documents, doc_type: str = "default", filename: str = "unkno
             "user_id":       user_id,
         })
 
-    print(f"[Chunker] {len(documents)} doc(s) → {len(chunks)} chunks")
+    print(f"[Chunker] {len(documents)} doc(s) → {len(chunks)} chunks for user_id={user_id}")
     return chunks
 
 
-def create_vector_store(chunks, persist_directory="db/chroma_db"):
-    print("Creating vector store and storing in Chroma DB...")
+def create_vector_store(chunks):
+    print("Creating vector store and storing in Chroma Cloud...")
     embedding_model = OpenAIEmbeddings(
         model="text-embedding-3-small",
         openai_api_key=os.getenv("OPENAI_API_KEY")
@@ -103,17 +99,18 @@ def create_vector_store(chunks, persist_directory="db/chroma_db"):
     vectorstore = Chroma.from_documents(
         documents=chunks,
         embedding=embedding_model,
-        persist_directory=persist_directory,
+        client=chroma_client,
+        collection_name="prodigy_documents",   # must match retrieval_pipeline.py
         collection_metadata={"hnsw:space": "cosine"},
     )
-    print(f"[VectorStore] {len(chunks)} chunks persisted at: {persist_directory}")
+    print(f"[VectorStore] {len(chunks)} chunks persisted to Chroma Cloud.")
     return vectorstore
 
 
-def ingest_file(file_path, doc_type: str = "default"):
+def ingest_file(file_path, doc_type: str = "default", user_id: str = None):
     filename = os.path.basename(file_path)
     documents = load_document(file_path)
-    chunks = split_documents(documents, doc_type=doc_type, filename=filename)
+    chunks = split_documents(documents, doc_type=doc_type, filename=filename, user_id=user_id)
     vectorstore = create_vector_store(chunks)
     return vectorstore
 

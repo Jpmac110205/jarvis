@@ -1,4 +1,5 @@
 import os
+import chromadb
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
@@ -7,15 +8,21 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 load_dotenv()
 
-persistent_directory = "db/chroma_db"
-
 embedding_model = OpenAIEmbeddings(
     model="text-embedding-3-small",
     openai_api_key=os.getenv("OPENAI_API_KEY")
 )
 
+# Chroma Cloud client — replaces local persist_directory
+chroma_client = chromadb.CloudClient(
+    api_key=os.getenv("CHROMA_API_KEY"),
+    tenant=os.getenv("CHROMA_TENANT"),
+    database=os.getenv("CHROMA_DATABASE"),
+)
+
 db = Chroma(
-    persist_directory=persistent_directory,
+    client=chroma_client,
+    collection_name="prodigy_documents",   # pick one, must match ingestion side
     embedding_function=embedding_model,
     collection_metadata={"hnsw:space": "cosine"},
 )
