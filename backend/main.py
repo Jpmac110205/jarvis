@@ -321,12 +321,11 @@ model = ChatOpenAI(
     openai_api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-def embed_on_upload(file_path: str, doc_type: str = "default"):
-    # No more pdf_to_txt() needed — load_document handles both
+def embed_on_upload(file_path: str, doc_type: str = "default", user_id: str = None):
     documents = load_document(file_path)
-    chunks = split_documents(documents, doc_type=doc_type, filename=os.path.basename(file_path))
+    chunks = split_documents(documents, doc_type=doc_type, filename=os.path.basename(file_path), user_id=user_id)
     create_vector_store(chunks)
-    print(f"[Ingest] {file_path} ingested successfully.")
+    print(f"[Ingest] {file_path} ingested successfully for user_id={user_id}")
 
 def get_db_conn():
     conn = sqlite3.connect("db/memory.db")
@@ -385,7 +384,11 @@ async def chat(request: Request):
         if route == "RAG":
             try:
                 query_embedding = embedding_model.embed_query(user_message)
-                rag_results = db.similarity_search_by_vector(query_embedding, k=4)
+                rag_results = db.similarity_search_by_vector(
+                    query_embedding,
+                    k=4,
+                    filter={"user_id": user_id}   # NEW — scopes retrieval to this user only
+                )
                 if rag_results:
                     context_block += "\n\n=== Retrieved Context From Your Documents ===\n"
                     context_block += "\n---\n".join([
@@ -397,7 +400,6 @@ async def chat(request: Request):
             except Exception as e:
                 print(f"[RAG] Retrieval failed: {e}")
                 context_block += "\n\n[Document retrieval failed. Answering from general knowledge.]"
-
         elif route == "WEB":
             context_block += "\n\n[Web search not yet implemented. Answering from general knowledge — this answer may be outdated.]"
 
@@ -859,32 +861,33 @@ def update_user(user_id: int, user: UserUpdate):
 
 @app.post("/upload")
 async def upload_file(
+    request: Request,
     file: UploadFile,
     doc_type: str = Form(default="default")
 ):
-    # Validate file type server-side too
+    user_id = request.headers.get("X-User-ID") or request.cookies.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated.")
+
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-    
-    # Write to a known temp location with the original filename preserved
+
     upload_dir = os.path.join(backend_dir, "uploaded_docs")
     os.makedirs(upload_dir, exist_ok=True)
-    
     file_path = os.path.join(upload_dir, file.filename)
-    
+
     contents = await file.read()
     with open(file_path, "wb") as f:
         f.write(contents)
-    
+
     try:
-        embed_on_upload(file_path, doc_type=doc_type)
+        embed_on_upload(file_path, doc_type=doc_type, user_id=user_id)
     except Exception as e:
-        # Clean up the file if ingestion fails
         os.remove(file_path)
         print(f"[Upload] Ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=f"File saved but ingestion failed: {str(e)}")
-    
-    print(f"[Upload] {file.filename} uploaded and ingested successfully.")
+
+    print(f"[Upload] {file.filename} uploaded and ingested successfully for user_id={user_id}")
     return {"filename": file.filename, "status": "ingested", "doc_type": doc_type}
 
 # ==================== RUN SERVER ====================

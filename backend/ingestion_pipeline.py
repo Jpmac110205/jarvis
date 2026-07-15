@@ -62,7 +62,7 @@ def get_chunk_params(total_chars: int, doc_type: str) -> tuple[int, int]:
     return chunk_size, chunk_overlap
 
 
-def split_documents(documents, doc_type: str = "default", filename: str = "unknown"):
+def split_documents(documents, doc_type: str = "default", filename: str = "unknown", user_id: str = None):
     # Measure total document size to drive variable chunking
     total_chars = sum(len(doc.page_content) for doc in documents)
 
@@ -87,6 +87,7 @@ def split_documents(documents, doc_type: str = "default", filename: str = "unkno
             "chunk_size":    chunk_size,
             "chunk_overlap": chunk_overlap,
             "total_chars":   total_chars,
+            "user_id":       user_id,
         })
 
     print(f"[Chunker] {len(documents)} doc(s) → {len(chunks)} chunks")
