@@ -26,6 +26,7 @@ import secrets
 
 
 from storage import user_repository
+from storage import token_repository
 
 from ingestion_pipeline import load_document, split_documents, create_vector_store
 from retrieval_pipeline import embedding_model, db
@@ -63,12 +64,12 @@ app.add_middleware(
     )
 
 user_repository.create_table()
+token_repository.create_table()
+
 # ==================== GLOBAL STATE ====================
 current_results = {
     "chat_history": [],  # Will store conversation history
 }
-user_tokens = {}  # key: user_id, value: token_data
-
 
 
 #Create a user class to be able to store initial keys for the database
@@ -355,7 +356,7 @@ async def chat(request: Request):
                     "system_prompt": db_user.get("system_prompt")
                 }
 
-            user_token_data = user_tokens.get(user_id)
+            user_token_data = token_repository.get_tokens(user_id)
             if user_token_data:
                 access_token = user_token_data["tokens"].get("access_token")
                 if access_token:
@@ -593,10 +594,8 @@ async def google_callback(request: Request):
             )
 
         # Store token data
-        user_tokens[user_id] = {
-            "tokens": token_data,
-            "profile": user_info
-        }
+        token_repository.save_tokens(user_id, token_data, user_info)
+
         
         print(f"User {user_id} authenticated successfully")
         print(f"Stored tokens for user: {user_id}")
@@ -652,7 +651,7 @@ async def events(
                 status_code=401
             )
                 
-        user_data = user_tokens.get(user_id)
+        user_data = token_repository.get_tokens(user_id)
         if not user_data:
             return JSONResponse(
                 {"error": "session_expired", "message": "Session expired. Please log in again."},
@@ -708,7 +707,7 @@ async def tasks(
                 status_code=401
             )
         
-        user_data = user_tokens.get(user_id)
+        user_data = token_repository.get_tokens(user_id)
         if not user_data:
             return JSONResponse(
                 {"error": "session_expired", "message": "Session expired. Please log in again."},
@@ -755,10 +754,10 @@ async def auth_status(
     if not user_id:
         user_id = request.headers.get("X-User-ID")
     
-    if not user_id or user_id not in user_tokens:
+    user_data = token_repository.get_tokens(user_id)
+    if not user_id or not user_data:
         return {"authenticated": False}
-    
-    user_data = user_tokens[user_id]
+
     profile = user_data["profile"]
 
     # Check if user exists in DB
@@ -803,8 +802,8 @@ async def auth_status(
 @app.post("/auth/logout")
 async def logout(user_id: Optional[str] = Cookie(None)):
     """Log out user"""
-    if user_id and user_id in user_tokens:
-        del user_tokens[user_id]
+    if user_id:
+        token_repository.delete_tokens(user_id)
     
     response = JSONResponse({"status": "logged out"})
     response.delete_cookie("user_id")
