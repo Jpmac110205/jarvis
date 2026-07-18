@@ -178,7 +178,7 @@ def create_system_message(user_data: dict = None, calendar_context: str = ""):
 dist_dir = os.path.join(os.path.dirname(__file__), "dist")
 
 app.mount(
-    "/app/assets",
+    "/assets",
     StaticFiles(directory=os.path.join(dist_dir, "assets")),
     name="assets"
 )
