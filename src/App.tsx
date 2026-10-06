@@ -1,13 +1,20 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Bars3Icon,
+  XMarkIcon,
+  CalendarDaysIcon,
+} from "@heroicons/react/24/outline";
 import Chat from "./components/MiddlePanel/Chat";
 import { TasksPanel } from "./components/MiddlePanel/Tasks";
 import { CalendarPanel } from "./components/MiddlePanel/Calendar";
 import { SettingsPanel } from "./components/MiddlePanel/Settings";
-import { LeftPanel } from "./components/LeftPanel/Left";  
+import { LeftPanel } from "./components/LeftPanel/Left";
 import { ProfilePanel } from "./components/MiddlePanel/Profile";
 import { ShortcutsPanel } from "./components/RightPanel/Shortcuts";
 import { DailyCalendar } from "./components/RightPanel/DailyCalendar";
-import { sendChatMessage } from "./services/api";
+import { apiRequest, sendChatMessage } from "./services/api";
+import { useGoogleData } from "./contexts/useGoogleData";
+import { usePreferences } from "./contexts/usePreferences";
 import PrivacyPolicy from "./components/home/privacy";
 
 export interface Message {
@@ -16,327 +23,269 @@ export interface Message {
   content: string;
   timestamp: string;
 }
-
-type LeftPanelSection =
-  | "calendar"
-  | "chat"
-  | "profile"
-  | "settings"
-  | "tasks"
-  | "privacy";
+export type Section =
+  "chat" | "calendar" | "tasks" | "profile" | "settings" | "privacy";
+const titles: Record<Section, string> = {
+  chat: "Assistant",
+  calendar: "Calendar",
+  tasks: "Tasks",
+  profile: "Your profile",
+  settings: "Settings",
+  privacy: "Privacy policy",
+};
 
 export default function App() {
-  // Handle OAuth callback - store user_id but don't reload
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const userId = params.get('user_id');
-    const authStatus = params.get('auth');
-    
-    if (userId && authStatus === 'success') {
-      // Store user_id in localStorage
-      localStorage.setItem('user_id', userId);
-      
-      // Clean up URL without reloading
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
+  const { user } = useGoogleData();
+  return <Workspace key={user?.id ?? "guest"} />;
+}
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      author: "bot",
-      content: "Welcome back sir! How may I assist you today?",
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    },
-  ]);
-
-  const [middle, setMiddle] = useState<
-    | "home"
-    | "privacy"
-    | "chat"
-    | "tasks"
-    | "profile"
-    | "settings"
-    | "calendar"
-  >("home");
+function Workspace() {
+  const { user, loading, online, refreshProfile } = useGoogleData();
+  const { preferences } = usePreferences();
+  const [section, setSection] = useState<Section>("chat");
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(Boolean(user));
+  const sending = useRef(false);
+  const pendingRequest = useRef<{ text: string; id: string } | null>(null);
+  const owner = useRef(user?.id);
+  owner.current = user?.id;
+  const userId = user?.id;
+  const draftKey = user ? `prodigy_draft_${user.id}` : null;
 
-  // Hidden state for side panels
-  const [leftHidden, setLeftHidden] = useState(false);
-  const [rightHidden, setRightHidden] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (!userId) return;
+    setHistoryLoading(true);
+    void apiRequest<{
+      messages: {
+        id: number;
+        role: string;
+        content: string;
+        created_at: string;
+      }[];
+    }>("/conversation")
+      .then((data) => {
+        if (active)
+          setMessages(
+            data.messages.map((m) => ({
+              id: m.id,
+              author: m.role === "user" ? "user" : "bot",
+              content: m.content,
+              timestamp: new Date(
+                m.created_at.includes("Z") ||
+                  /[+-]\d\d:\d\d$/.test(m.created_at)
+                  ? m.created_at
+                  : `${m.created_at.replace(" ", "T")}Z`,
+              ).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+            })),
+          );
+      })
+      .catch((cause) => {
+        if (active)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Conversation couldn't be loaded.",
+          );
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
-  const leftPanelMiddle: LeftPanelSection =
-    middle === "home" ? "chat" : middle;
+  useEffect(() => {
+    if (!draftKey || !preferences.autoSave) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) || "null");
+      if (saved && Date.now() - saved.savedAt < 48 * 3600000) {
+        setInput(saved.text || "");
+        if (saved.requestId)
+          pendingRequest.current = { text: saved.text, id: saved.requestId };
+      } else localStorage.removeItem(draftKey);
+    } catch {
+      localStorage.removeItem(draftKey);
+    }
+  }, [draftKey, preferences.autoSave]);
+
+  function changeInput(value: string) {
+    setInput(value);
+    if (pendingRequest.current?.text !== value.trim())
+      pendingRequest.current = null;
+    if (draftKey && preferences.autoSave)
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          text: value,
+          savedAt: Date.now(),
+          requestId: pendingRequest.current?.id,
+        }),
+      );
+  }
 
   async function sendMessage() {
-    if (!input.trim()) return;
-
-    const userMessageText = input.trim();
-    setInput(""); // Clear input immediately
-
-    // Create user message
-    const userMessage: Message = {
-      id: Date.now(),
-      author: "user",
-      content: userMessageText,
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-
-    // Add user message to the UI immediately (optimistic update)
-    setMessages((m) => [...m, userMessage]);
-
-    // Show typing indicator
-    setIsTyping(true);
-
-    // Get current history (excluding the welcome message for API call, or include all)
-    const currentHistory = messages;
-
+    if (!input.trim() || sending.current || !user || historyLoading) return;
+    const account = user.id;
+    const text = input.trim();
+    sending.current = true;
+    setBusy(true);
+    setError(null);
     try {
-      // Send message to backend
-      const response = await sendChatMessage(userMessageText, currentHistory);
-
-      if (response.error) {
-        // If there's an error, add an error message
-        const errorMessage: Message = {
+      if (pendingRequest.current?.text !== text)
+        pendingRequest.current = { text, id: crypto.randomUUID() };
+      if (draftKey && preferences.autoSave)
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            text,
+            savedAt: Date.now(),
+            requestId: pendingRequest.current.id,
+          }),
+        );
+      const response = await sendChatMessage(text, pendingRequest.current.id);
+      if (owner.current !== account) return;
+      if (response.error) throw new Error(response.error);
+      const timestamp = new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      setMessages((previous) => [
+        ...previous,
+        { id: Date.now(), author: "user", content: text, timestamp },
+        {
           id: Date.now() + 1,
           author: "bot",
           content: response.reply,
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        };
-        setMessages((m) => [...m, errorMessage]);
-      } else {
-        // Add AI response to the UI
-        const aiMessage: Message = {
-          id: Date.now() + 1,
-          author: "bot",
-          content: response.reply,
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        };
-        setMessages((m) => [...m, aiMessage]);
-      }
-    } catch (error) {
-      // Handle unexpected errors
-      const errorMessage: Message = {
-        id: Date.now() + 1,
-        author: "bot",
-        content: "Sorry, an unexpected error occurred. Please try again.",
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      };
-      setMessages((m) => [...m, errorMessage]);
+          timestamp,
+        },
+      ]);
+      changeInput("");
+      pendingRequest.current = null;
+      void refreshProfile().catch(() => {});
+    } catch (cause) {
+      if (owner.current === account)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Message couldn't be sent. Please try again.",
+        );
     } finally {
-      // Hide typing indicator
-      setIsTyping(false);
+      sending.current = false;
+      setBusy(false);
     }
   }
 
+  function navigate(view: Section) {
+    setSection(view);
+    setNavigationOpen(false);
+    setOverviewOpen(false);
+  }
   return (
-    <div className="h-screen w-screen relative flex bg-[#050507] text-[#f0f0f5] font-sans font-light overflow-hidden selection:bg-blue-500/30
-      before:content-[''] before:fixed before:inset-0 before:pointer-events-none before:z-0
-      before:bg-[linear-gradient(rgba(59,130,246,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.025)_1px,transparent_1px)]
-      before:bg-[size:60px_60px]"
-    >
-      {/* Dynamic Ambient Cyber Glow Behind the workspace */}
-      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-full max-w-[900px] h-[600px] pointer-events-none bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.06)_0%,transparent_70%)] z-0" />
-
-      {/* Left panel + Custom High-Tech sliding toggle anchor */}
-      <div className="relative flex-shrink-0 h-full z-20 flex">
-        <div
-          className="h-full overflow-hidden transition-all duration-300 ease-out"
-          style={{ width: leftHidden ? 0 : "16rem" }}
-        >
-          <div className="w-64 h-full">
-            <LeftPanel middle={leftPanelMiddle} onSelect={(section) => setMiddle(section)} />
-          </div>
-        </div>
-
-        {/* Customized Cyber Slider handle */}
+    <div className="workspace">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      {(navigationOpen || overviewOpen) && (
         <button
-          onClick={() => setLeftHidden((s) => !s)}
-          aria-label={leftHidden ? "Show left panel" : "Hide left panel"}
-          className="absolute top-1/2 -translate-y-1/2 z-30 bg-[#0c0c10] hover:bg-[#0f0f15] text-[#7a7a8c] hover:text-[#3b82f6] w-[16px] h-12 flex items-center justify-center rounded-r-xl border-y border-r border-[rgba(59,130,246,0.15)] shadow-[4px_0_15px_rgba(0,0,0,0.5)] transition-all duration-300 focus:outline-none"
-          style={{ left: leftHidden ? 0 : "16rem" }}
+          className="mobile-backdrop"
+          aria-label="Close panels"
+          onClick={() => {
+            setNavigationOpen(false);
+            setOverviewOpen(false);
+          }}
+        />
+      )}
+      <div className={`navigation-shell ${navigationOpen ? "is-open" : ""}`}>
+        <button
+          className="mobile-close icon-button"
+          onClick={() => setNavigationOpen(false)}
+          aria-label="Close navigation"
         >
-          <span className="text-[11px] font-bold font-mono">
-            {leftHidden ? "›" : "‹"}
-          </span>
+          <XMarkIcon />
         </button>
+        <LeftPanel middle={section} onSelect={navigate} />
       </div>
-
-      {/* Main Container Area */}
-      <main className="flex-1 flex flex-col items-center overflow-hidden h-full relative z-10 bg-transparent">
-        <MiddleHeader middle={middle} />
-        
-        <div className="flex-1 w-full overflow-hidden flex flex-col items-center">
-          <MiddlePanel
-            middle={middle}
-            messages={messages}
-            input={input}
-            onChange={setInput}
-            onSend={sendMessage}
-            isTyping={isTyping}
-          />
+      <main id="main-content" className="workspace-main">
+        <header className="workspace-header">
+          <div className="header-title">
+            <button
+              className="mobile-menu icon-button"
+              onClick={() => setNavigationOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={navigationOpen}
+            >
+              <Bars3Icon />
+            </button>
+            <span className="breadcrumb">
+              Workspace <span>/</span>
+            </span>
+            <h1>{titles[section]}</h1>
+          </div>
+          <div className="header-actions">
+            <span
+              className={`service-status ${online === false ? "offline" : ""}`}
+            >
+              <i />
+              {online === null
+                ? "Checking service"
+                : online
+                  ? "Service available"
+                  : "Service unavailable"}
+            </span>
+            <button
+              className="overview-toggle icon-button"
+              onClick={() => setOverviewOpen((value) => !value)}
+              aria-label="Toggle daily overview"
+              aria-expanded={overviewOpen}
+            >
+              <CalendarDaysIcon />
+            </button>
+          </div>
+        </header>
+        <div
+          className={`workspace-content ${section === "chat" ? "chat-content" : ""}`}
+        >
+          {section === "chat" && (
+            <Chat
+              messages={messages}
+              input={input}
+              onChange={changeInput}
+              onSend={() => void sendMessage()}
+              isTyping={busy}
+              disabled={!user || loading || historyLoading}
+              historyLoading={historyLoading}
+              error={error}
+            />
+          )}
+          {section === "calendar" && <CalendarPanel />}
+          {section === "tasks" && <TasksPanel />}
+          {section === "profile" && <ProfilePanel />}
+          {section === "settings" && <SettingsPanel />}
+          {section === "privacy" && (
+            <div className="privacy-content">
+              <PrivacyPolicy />
+            </div>
+          )}
         </div>
       </main>
-
-      {/* Right panel + Custom High-Tech sliding toggle anchor */}
-      <div className="relative flex-shrink-0 h-full z-20 flex">
-        {/* Customized Cyber Slider handle */}
+      <aside className={`overview-shell ${overviewOpen ? "is-open" : ""}`}>
         <button
-          onClick={() => setRightHidden((s) => !s)}
-          aria-label={rightHidden ? "Show right panel" : "Hide right panel"}
-          className="absolute top-1/2 -translate-y-1/2 z-30 bg-[#0c0c10] hover:bg-[#0f0f15] text-[#7a7a8c] hover:text-[#3b82f6] w-[16px] h-12 flex items-center justify-center rounded-l-xl border-y border-l border-[rgba(59,130,246,0.15)] shadow-[-4px_0_15px_rgba(0,0,0,0.5)] transition-all duration-300 focus:outline-none"
-          style={{ right: rightHidden ? 0 : "16rem" }}
+          className="mobile-close icon-button"
+          onClick={() => setOverviewOpen(false)}
+          aria-label="Close overview"
         >
-          <span className="text-[11px] font-bold font-mono">
-            {rightHidden ? "‹" : "›"}
-          </span>
+          <XMarkIcon />
         </button>
-
-        <div
-          className="h-full overflow-hidden transition-all duration-300 ease-out"
-          style={{ width: rightHidden ? 0 : "16rem" }}
-        >
-          <div className="w-64 h-full">
-            <RightPanel />
-          </div>
-        </div>
-      </div>
+        <DailyCalendar onSelect={navigate} />
+        <ShortcutsPanel onSelect={navigate} />
+      </aside>
     </div>
   );
-}
-
-/* ---------------- Right Panel Wrapper Component ---------------- */
-function RightPanel() {
-  return (
-    <aside className="w-64 bg-[#050507] border-l border-[rgba(59,130,246,0.15)] p-5 flex flex-col h-screen relative z-10 overflow-hidden">
-      {/* Decorative background grid matrix strictly for sidebar depth */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.015] bg-[linear-gradient(rgba(59,130,246,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.2)_1px,transparent_1px)] bg-[size:15px_15px]" />
-      
-      <div className="flex-1 overflow-y-auto scrollbar-none relative z-10">
-        <DailyCalendar />
-      </div>
-      
-      <div className="mt-auto border-t border-[rgba(59,130,246,0.15)] pt-5 relative z-10">
-        <ShortcutsPanel />
-      </div>
-    </aside>
-  );
-}
-
-/* ---------------- Middle Header Component ---------------- */
-function MiddleHeader({ middle }: { middle: string }) {
-  const titleMap: Record<string, string> = {
-    home: "Home",
-    privacy: "Privacy Policy",
-    chat: "PRODIGY.",
-    tasks: "Tasks Management",
-    profile: "Partner Profile",
-    settings: "System Settings",
-    calendar: "Calendar Matrix",
-  };
-
-  return (
-    <header className="w-full max-w-3xl px-6 py-4 border-b border-[rgba(59,130,246,0.15)] bg-[#050507]/60 backdrop-blur-md flex items-center justify-between z-10">
-      <h1 className="text-sm font-['Syne'] font-extrabold tracking-[0.15em] text-[#f0f0f5] uppercase">
-        {titleMap[middle] ?? "Prodigy"}
-      </h1>
-      <div className="flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] animate-pulse" />
-        <span className="text-[9px] font-mono tracking-widest text-[#7a7a8c] uppercase">System Online</span>
-      </div>
-    </header>
-  );
-}
-
-/* ---------------- Middle Panel router switch ---------------- */
-function MiddlePanel({
-  middle,
-  messages,
-  input,
-  onChange,
-  onSend,
-  isTyping,
-}: {
-  middle: "home" | "privacy" | "chat" | "tasks" | "profile" | "settings" | "calendar";
-  messages: Message[];
-  input: string;
-  onChange: (v: string) => void;
-  onSend: () => void;
-  isTyping: boolean;
-}) {
-  switch (middle) {
-
-    case "privacy":
-      return (
-        <div className="w-full h-full overflow-y-auto scrollbar-thin">
-          <PrivacyPolicy />
-        </div>
-      );
-
-    case "chat":
-      return (
-        <Chat
-          messages={messages}
-          input={input}
-          onChange={onChange}
-          onSend={onSend}
-          isTyping={isTyping}
-        />
-      );
-
-    case "tasks":
-      return (
-        <div className="w-full h-full overflow-y-auto flex justify-center">
-          <TasksPanel />
-        </div>
-      );
-
-    case "profile":
-      return (
-        <div className="w-full h-full overflow-y-auto flex justify-center">
-          <ProfilePanel />
-        </div>
-      );
-
-    case "settings":
-      return (
-        <div className="w-full h-full overflow-y-auto flex justify-center">
-          <SettingsPanel />
-        </div>
-      );
-
-    case "calendar":
-      return (
-        <div className="w-full h-full overflow-y-auto flex justify-center">
-          <CalendarPanel />
-        </div>
-      );
-
-    default:
-      return (
-        <Chat
-          messages={messages}
-          input={input}
-          onChange={onChange}
-          onSend={onSend}
-          isTyping={isTyping}
-        />
-      );
-  }
 }

@@ -1,179 +1,180 @@
-import { createContext, useContext, useEffect, useState } from "react";
+/* Shared account and Google data; one session bootstrap, explicit failures. */
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { GoogleDataContext } from "./useGoogleData";
+import type {
+  AgendaItem,
+  AppConfig,
+  GoogleEvent,
+  GoogleTask,
+  TaskItem,
+  UserProfile,
+} from "./useGoogleData";
+import { dateKey, formatEvents } from "../services/google";
+import { ApiError, apiRequest } from "../services/api";
 
-type AgendaItem = {
-  time: string;
-  event: string;
-  date: string;
-};
-
-type TaskItem = {
-  title: string;
-  due?: string;
-  listTitle?: string;
-};
-
-type GoogleDataContextType = {
-  agenda: AgendaItem[];
-  todayAgenda: AgendaItem[];
-  tasks: TaskItem[];
-  connected: boolean;
-  loading: boolean;
-  refresh: () => Promise<void>;
-};
-
-interface GoogleEvent {
-  start?: {
-    dateTime?: string;
-    date?: string;
-  };
-  summary?: string;
-}
-
-const GoogleDataContext = createContext<GoogleDataContextType | null>(null);
-
-export function GoogleDataProvider({ children }: { children: React.ReactNode }) {
+export function GoogleDataProvider({ children }: { children: ReactNode }) {
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
-  const [todayAgenda, setTodayAgenda] = useState<AgendaItem[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [connected, setConnected] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [online, setOnline] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [agendaError, setAgendaError] = useState<string | null>(null);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const generation = useRef(0);
 
-  async function fetchAll() {
-    setLoading(true);
-    try {
-      // Get user_id from localStorage
-      const userId = localStorage.getItem('user_id');
-      
-      const headers: HeadersInit = {};
-      
-      // Add user_id header if available
-      if (userId) {
-        headers['X-User-ID'] = userId;
-        console.log('Fetching with user_id:', userId);
-      } else {
-        console.log('No user_id in localStorage yet');
-      }
-
-      const [eventsRes, tasksRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_BACKEND_URL}/events`, { 
-          credentials: "include",
-          headers 
-        }),
-        fetch(`${import.meta.env.VITE_BACKEND_URL}/tasks`, { 
-          credentials: "include",
-          headers 
-        }),
-      ]);
-
-      console.log('Events response status:', eventsRes.status);
-      console.log('Tasks response status:', tasksRes.status);
-
-      if (eventsRes.status === 401 || tasksRes.status === 401) {
-        console.log('Got 401. Events 401?', eventsRes.status === 401, 'Tasks 401?', tasksRes.status === 401);
-        setConnected(false);
-        setAgenda([]);
-        setTodayAgenda([]);
-        setTasks([]);
-        // Clear stored user_id if unauthorized
-        localStorage.removeItem('user_id');
-        return;
-      }
-
-      const eventsData = await eventsRes.json();
-      const tasksData = await tasksRes.json();
-
-      console.log('Events data:', eventsData);
-      console.log('Tasks data:', tasksData);
-
-      const { allEvents, todayEvents } = formatEvents(eventsData.items || []);
-      setAgenda(allEvents);
-      setTodayAgenda(todayEvents);
-      setTasks(formatTasks(tasksData.items || []));
-      setConnected(true);
-      console.log('✅ Google data loaded successfully');
-    } catch (err) {
-      console.error("❌ Google data fetch failed:", err);
-      setConnected(false);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchAll();
+  const refreshProfile = useCallback(async () => {
+    const current = generation.current;
+    const data = await apiRequest<{
+      authenticated: boolean;
+      user?: UserProfile;
+    }>("/auth/status");
+    if (current !== generation.current) return;
+    setUser(data.authenticated && data.user ? data.user : null);
   }, []);
 
-  // Watch for user_id changes in localStorage
-  useEffect(() => {
-    const userId = localStorage.getItem('user_id');
-    
-    // If user_id changed, re-fetch
-    if (userId && userId !== trackedUserId) {
-      console.log('User_id detected in localStorage, fetching Google data:', userId);
-      setTrackedUserId(userId);
-      fetchAll();
-    } else if (!userId && trackedUserId) {
-      // User logged out
-      console.log('User logged out');
-      setTrackedUserId(null);
-      setConnected(false);
-      setAgenda([]);
-      setTodayAgenda([]);
-      setTasks([]);
+  const refresh = useCallback(async () => {
+    const current = ++generation.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const status = await apiRequest<{
+        authenticated: boolean;
+        user?: UserProfile;
+      }>("/auth/status");
+      if (current !== generation.current) return;
+      setUser(status.authenticated && status.user ? status.user : null);
+      if (!status.authenticated) {
+        setConnected(false);
+        setAgenda([]);
+        setTasks([]);
+        localStorage.removeItem("prodigy_session");
+        return;
+      }
+      // Include all of today, so earlier meetings do not disappear from the overview.
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const [eventsResult, tasksResult] = await Promise.allSettled([
+        apiRequest<{ items: GoogleEvent[] }>(
+          `/events?time_min=${encodeURIComponent(start.toISOString())}`,
+        ),
+        apiRequest<{ items: GoogleTask[] }>("/tasks"),
+      ]);
+      if (current !== generation.current) return;
+      setAgenda(
+        eventsResult.status === "fulfilled"
+          ? formatEvents(eventsResult.value.items || [])
+          : [],
+      );
+      setTasks(
+        tasksResult.status === "fulfilled"
+          ? (tasksResult.value.items || []).map((task) => ({
+              id: `${task.listId}:${task.id}`,
+              title: task.title || "Untitled task",
+              due: task.due,
+              listTitle: task.listTitle || "My Tasks",
+              done: task.status === "completed",
+            }))
+          : [],
+      );
+      setAgendaError(
+        eventsResult.status === "rejected"
+          ? eventsResult.reason instanceof Error
+            ? eventsResult.reason.message
+            : "Calendar couldn't be refreshed."
+          : null,
+      );
+      setTasksError(
+        tasksResult.status === "rejected"
+          ? tasksResult.reason instanceof Error
+            ? tasksResult.reason.message
+            : "Tasks couldn't be refreshed."
+          : null,
+      );
+      const failure =
+        eventsResult.status === "rejected"
+          ? eventsResult.reason
+          : tasksResult.status === "rejected"
+            ? tasksResult.reason
+            : null;
+      setConnected(!failure);
+      if (failure)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Google data couldn't be refreshed.",
+        );
+    } catch (cause) {
+      if (current !== generation.current) return;
+      const message =
+        cause instanceof Error ? cause.message : "Unable to load your account.";
+      setError(message);
+      setAgendaError(message);
+      setTasksError(message);
+      if (cause instanceof ApiError && cause.status === 401) {
+        setUser(null);
+        setAgenda([]);
+        setTasks([]);
+        setConnected(false);
+      }
+    } finally {
+      if (current === generation.current) setLoading(false);
     }
-  }, [trackedUserId]);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    void apiRequest<AppConfig>("/config")
+      .then(setConfig)
+      .catch(() => setConfig(null));
+    const checkHealth = () => {
+      void apiRequest<{ status: string }>("/health")
+        .then((data) => setOnline(data.status === "ok"))
+        .catch(() => setOnline(false));
+    };
+    checkHealth();
+    const timer = window.setInterval(checkHealth, 60000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [refresh]);
+
+  const logout = async () => {
+    await apiRequest("/auth/logout", { method: "POST" });
+    ++generation.current;
+    localStorage.removeItem("prodigy_session");
+    localStorage.removeItem("user_id");
+    setUser(null);
+    setAgendaError(null);
+    setTasksError(null);
+    setConnected(false);
+    setTasks([]);
+    setAgenda([]);
+  };
 
   return (
     <GoogleDataContext.Provider
-      value={{ agenda, todayAgenda, tasks, connected, loading, refresh: fetchAll }}
+      value={{
+        agenda,
+        todayAgenda: agenda.filter((item) => item.date === dateKey(new Date())),
+        tasks,
+        user,
+        config,
+        connected,
+        loading,
+        error,
+        agendaError,
+        tasksError,
+        online,
+        refresh,
+        refreshProfile,
+        logout,
+      }}
     >
       {children}
     </GoogleDataContext.Provider>
   );
-}
-
-export function useGoogleData() {
-  const ctx = useContext(GoogleDataContext);
-  if (!ctx) {
-    throw new Error("useGoogleData must be used within GoogleDataProvider");
-  }
-  return ctx;
-}
-
-function formatEvents(items: GoogleEvent[]): { allEvents: AgendaItem[]; todayEvents: AgendaItem[] } {
-  const today = new Date();
-  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-  const allEvents: AgendaItem[] = items.map((event) => {
-    const eventDate = event.start?.dateTime 
-      ? new Date(event.start.dateTime)
-      : event.start?.date
-      ? new Date(event.start.date + 'T00:00:00')
-      : new Date();
-
-    const dateKey = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`;
-
-    return {
-      time: event.start?.dateTime
-        ? new Date(event.start.dateTime).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "All Day",
-      event: event.summary || "Untitled Event",
-      date: dateKey,
-    };
-  });
-
-  const todayEvents = allEvents.filter((item) => item.date === todayString);
-  return { allEvents, todayEvents };
-}
-
-function formatTasks(items: any[]): TaskItem[] {
-  return items.map((item) => ({
-    title: item.title || "Untitled Task",
-    due: item.due,
-    listTitle: item.listTitle || "My Tasks",
-  }));
 }

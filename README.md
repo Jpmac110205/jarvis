@@ -76,7 +76,7 @@ Prodigy determines whether a request should use:
 
 - Personal knowledge base (RAG)
 - LLM pretrained knowledge
-- Real-time web search
+- Requests requiring current web information (identified; live search is not connected)
 
 This reduces unnecessary retrieval while improving response quality.
 
@@ -94,6 +94,8 @@ Examples:
 > "What's on my calendar tomorrow?"
 
 > "Add 'Finish Operating Systems Assignment' to my tasks."
+
+Google access is currently read only; the task-creation example above requires a future write integration.
 
 Calendar events are automatically formatted and injected into the system prompt, allowing responses to remain context-aware.
 
@@ -214,7 +216,7 @@ GPT-4 Response
 
 ### Layered Memory
 
-Rather than storing every conversation indefinitely, Prodigy separates memory into conversational, short-term, and long-term layers to reduce prompt size while preserving important information.
+Rather than including every saved conversation in each prompt, Prodigy separates memory into conversational, short-term, and long-term layers to reduce prompt size while preserving important information.
 
 ---
 
@@ -235,6 +237,10 @@ This significantly improves efficiency while reducing hallucinations.
 Uploaded documents are embedded once and reused across future sessions, eliminating repeated processing while creating a growing personal knowledge base.
 
 ---
+
+## Production maintenance and verification
+
+See [the production rollout guide](docs/production-rollout.md) for the memory fixes, configuration, non-destructive legacy migration, test commands, and rollback limits. Production memory now uses PostgreSQL and Chroma Cloud, with verified account sessions and retryable vector indexing.
 
 ## Future Improvements
 

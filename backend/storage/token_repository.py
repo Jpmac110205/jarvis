@@ -5,14 +5,16 @@ from dotenv import load_dotenv
 
 
 backend_dir = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(backend_dir, '.env'))
+load_dotenv(os.path.join(backend_dir, "..", ".env"))
 
 
 def get_connection():
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise RuntimeError("DATABASE_URL not set — check your .env file")
-    return psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
+    return psycopg2.connect(
+        db_url, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=10
+    )
 
 
 # ==================== TABLE SETUP ====================
@@ -64,16 +66,19 @@ def save_tokens(user_id: str, token_data: dict, profile: dict):
             profile_json  = EXCLUDED.profile_json,
             updated_at    = CURRENT_TIMESTAMP
     """
-    cursor.execute(query, (
-        user_id,
-        token_data.get("access_token"),
-        token_data.get("refresh_token"),
-        token_data.get("expires_in"),
-        token_data.get("scope"),
-        token_data.get("token_type"),
-        token_data.get("id_token"),
-        json.dumps(profile),
-    ))
+    cursor.execute(
+        query,
+        (
+            user_id,
+            token_data.get("access_token"),
+            token_data.get("refresh_token"),
+            token_data.get("expires_in"),
+            token_data.get("scope"),
+            token_data.get("token_type"),
+            token_data.get("id_token"),
+            json.dumps(profile),
+        ),
+    )
     conn.commit()
     conn.close()
 
@@ -101,6 +106,7 @@ def get_tokens(user_id: str):
             "scope": row["scope"],
             "token_type": row["token_type"],
             "id_token": row["id_token"],
+            "obtained_at": row["updated_at"],
         },
         "profile": row["profile_json"],
     }

@@ -22,4 +22,4 @@ tiktoken
 pydantic
 aiohttp
 psycopg2-binary
-psycopg2
+langchain-text-splitters

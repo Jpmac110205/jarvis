@@ -1,17 +1,15 @@
-import { createContext, useContext, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
+import { GoogleConnectionContext } from "./useGoogleConnection";
 
-type GoogleConnectionContextType = {
-  connectedToGoogle: boolean | null;
-  setConnectedToGoogle: (value: boolean | null) => void;
-};
-
-const GoogleConnectionContext = createContext<GoogleConnectionContextType | undefined>(
-  undefined
-);
-
-export function GoogleConnectionProvider({ children }: { children: ReactNode }) {
-  const [connectedToGoogle, setConnectedToGoogle] = useState<boolean | null>(null);
+export function GoogleConnectionProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const [connectedToGoogle, setConnectedToGoogle] = useState<boolean | null>(
+    null,
+  );
 
   return (
     <GoogleConnectionContext.Provider
@@ -20,14 +18,4 @@ export function GoogleConnectionProvider({ children }: { children: ReactNode }) 
       {children}
     </GoogleConnectionContext.Provider>
   );
-}
-
-export function useGoogleConnection() {
-  const context = useContext(GoogleConnectionContext);
-  if (!context) {
-    throw new Error(
-      "useGoogleConnection must be used within a GoogleConnectionProvider"
-    );
-  }
-  return context;
 }

@@ -1,180 +1,184 @@
-import os
+"""SQL is the source of truth; vector changes are an idempotent, retryable index."""
+
+import logging
 from datetime import datetime, timezone
-from langchain_chroma import Chroma
-from langchain_core.documents import Document
-from langchain_community.embeddings import OpenAIEmbeddings
-import sqlite3
 
-from storage.database import init_memory_db
+from storage.vector_store import get_store
 
-embedding_model = OpenAIEmbeddings(
-    model="text-embedding-3-small",
-    openai_api_key=os.getenv("OPENAI_API_KEY")
-)
-
-SHORT_TERM_DIR = "db/chroma_short_term"
-LONG_TERM_DIR  = "db/chroma_long_term"
-
-# Thresholds
-SHORT_TERM_THRESHOLD = 0.15   # minimum score to stay in short-term
-PROMOTION_THRESHOLD  = 5      # frequency hits before staying short-term permanently
-TIER_SHIFT_DAYS      = 30     # days of no access before demotion to long-term
+logger = logging.getLogger(__name__)
+SHORT_COLLECTION = "prodigy_memory_short"
+LONG_COLLECTION = "prodigy_memory_long"
+SHORT_TERM_THRESHOLD = 0.15
+PROMOTION_THRESHOLD = 5
+TIER_SHIFT_DAYS = 30
+SIMILARITY_THRESHOLD = 0.5
 
 
-# ==================== SCORING ====================
-
-def compute_score(frequency: int, last_accessed: datetime) -> float:
-    """Higher = more relevant to keep in short-term"""
-    now = datetime.now(timezone.utc)
-    if last_accessed.tzinfo is None:
-        last_accessed = last_accessed.replace(tzinfo=timezone.utc)
-    days_since = (now - last_accessed).days
-    recency_weight = 1 / (days_since + 1)
-    return frequency * recency_weight
+def as_datetime(value):
+    value = datetime.fromisoformat(value) if isinstance(value, str) else value
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
-# ==================== RETRIEVAL ====================
-
-def get_conversational_context(chat_history: list, n: int = 10) -> list:
-    """Layer 1 — just the last N messages, no DB needed"""
-    return chat_history[-n:]
+def compute_score(frequency, last_accessed):
+    days_since = max(0, (datetime.now(timezone.utc) - as_datetime(last_accessed)).days)
+    return max(0, frequency) / (days_since + 1)
 
 
-def search_memory_tier(query: str, persist_dir: str, user_id: str, k: int = 2) -> list:
-    """Search a specific ChromaDB tier for relevant memories"""
+def get_conversational_context(chat_history, n=10):
+    return chat_history[-n:] if n > 0 else []
+
+
+def store_memory(summary, user_id, conn, embedding_id):
+    if not user_id or not summary.strip() or not embedding_id:
+        raise ValueError("A memory requires an owner, content and stable ID")
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """INSERT INTO memories (user_id, content, embedding_id, tier, frequency, last_accessed, created_at)
+        VALUES (?, ?, ?, 'short', 1, ?, ?) ON CONFLICT (user_id, embedding_id) DO NOTHING""",
+        (user_id, summary.strip(), embedding_id, now, now),
+    )
+    conn.commit()  # retain the summary even when embeddings/network are unavailable
+    sync_memory_index(conn, user_id)
+
+
+def sync_memory_index(conn, user_id, limit=50):
+    """Upsert destination before removing source. Interrupted moves can be retried.
+
+    The SQL tier validates search hits during a partial move. Never delete SQL content
+    as compensation for a vector failure: it is the durable recovery source.
+    Call under serialized_chat, or from the maintenance command while it holds that lock.
+    """
+    rows = conn.execute(
+        """SELECT embedding_id, content, tier, created_at FROM memories
+        WHERE user_id = ? AND (indexed_tier IS NULL OR indexed_tier <> tier)
+        ORDER BY id LIMIT ?""",
+        (user_id, limit),
+    ).fetchall()
+    synced = 0
+    for embedding_id, content, tier, created_at in rows:
+        try:
+            from langchain_core.documents import Document
+
+            target = SHORT_COLLECTION if tier == "short" else LONG_COLLECTION
+            source = LONG_COLLECTION if tier == "short" else SHORT_COLLECTION
+            # Stable, owner-prefixed IDs also tolerate legacy embedding-ID collisions.
+            vector_id = f"{user_id}:{embedding_id}"
+            get_store(target).add_documents(
+                [
+                    Document(
+                        page_content=content,
+                        metadata={
+                            "user_id": user_id,
+                            "embedding_id": embedding_id,
+                            "tier": tier,
+                            "created_at": str(created_at),
+                        },
+                    )
+                ],
+                ids=[vector_id],
+            )
+            get_store(source).delete(ids=[vector_id])
+            conn.execute(
+                "UPDATE memories SET indexed_tier = ? WHERE user_id = ? AND embedding_id = ? AND tier = ?",
+                (tier, user_id, embedding_id, tier),
+            )
+            conn.commit()
+            synced += 1
+        except Exception:
+            conn.rollback()
+            logger.exception("Memory indexing deferred; SQL content retained")
+            # A service outage should not make fifty identical network requests.
+            break
+    return synced
+
+
+def search_memory_tier(query, collection, user_id, k=2):
+    if not user_id:
+        return []
     try:
-        db = Chroma(
-            persist_directory=persist_dir,
-            embedding_function=embedding_model
+        results = get_store(collection).similarity_search_with_relevance_scores(
+            query, k=k, filter={"user_id": user_id}
         )
-        results = db.similarity_search_with_relevance_scores(
-            query,
-            k=k,
-            filter={"user_id": user_id}
-        )
-        # Only return results above similarity threshold
-        return [doc for doc, score in results if score > 0.5]
-    except Exception as e:
-        print(f"[Memory] Search failed in {persist_dir}: {e}")
+        return [
+            doc
+            for doc, score in results
+            if score > SIMILARITY_THRESHOLD and doc.metadata.get("user_id") == user_id
+        ]
+    except Exception:
+        logger.exception("Memory search unavailable in %s", collection)
         return []
 
 
-def retrieve_memory(query: str, user_id: str, conn) -> dict:
-    """
-    Waterfall through all three layers.
-    Returns whatever context was found and which tier it came from.
-    """
-    # Layer 2 — short-term
-    short_results = search_memory_tier(query, SHORT_TERM_DIR, user_id)
-    if short_results:
-        # Update frequency + recency for each hit
-        for doc in short_results:
+def retrieve_memory(query, user_id, conn):
+    if not user_id:
+        return {"context": "", "tier": "none"}
+    context, tiers, seen = [], [], set()
+    # Search both: a short-term hit must not hide relevant older information.
+    for collection, tier in ((SHORT_COLLECTION, "short"), (LONG_COLLECTION, "long")):
+        for doc in search_memory_tier(query, collection, user_id):
             embedding_id = doc.metadata.get("embedding_id")
-            if embedding_id:
-                bump_memory_score(embedding_id, conn)
-        return {
-            "context": "\n---\n".join([d.page_content for d in short_results]),
-            "tier": "short_term"
-        }
+            row = conn.execute(
+                "SELECT content, tier FROM memories WHERE user_id = ? AND embedding_id = ?",
+                (user_id, embedding_id),
+            ).fetchone()
+            if not row or row[1] != tier or embedding_id in seen:
+                continue
+            seen.add(embedding_id)
+            context.append(row[0])
+            tiers.append(tier)
+            bump_memory_score(embedding_id, conn, user_id)
+            if tier == "long":
+                maybe_promote(embedding_id, conn, user_id)
+    if not tiers:
+        return {"context": "", "tier": "none"}
+    return {
+        "context": "\n---\n".join(context),
+        "tier": "mixed"
+        if len(set(tiers)) > 1
+        else ("short_term" if tiers[0] == "short" else "long_term"),
+    }
 
-    # Layer 3 — long-term (only if short-term missed)
-    long_results = search_memory_tier(query, LONG_TERM_DIR, user_id)
-    if long_results:
-        for doc in long_results:
-            embedding_id = doc.metadata.get("embedding_id")
-            if embedding_id:
-                bump_memory_score(embedding_id, conn)
-                maybe_promote(embedding_id, conn)  # promote back to short-term if accessed again
-        return {
-            "context": "\n---\n".join([d.page_content for d in long_results]),
-            "tier": "long_term"
-        }
 
-    return {"context": "", "tier": "none"}
-
-
-# ==================== WRITING ====================
-
-def store_memory(summary: str, user_id: str, conn, embedding_id: str):
-    """Store a new memory in short-term by default"""
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO memories (user_id, content, embedding_id, tier, frequency, last_accessed)
-        VALUES (?, ?, ?, 'short', 1, ?)
-    """, (user_id, summary, embedding_id, datetime.now(timezone.utc)))
-    conn.commit()
-
-    # Write to ChromaDB short-term
-    doc = Document(
-        page_content=summary,
-        metadata={
-            "user_id": user_id,
-            "embedding_id": embedding_id,
-            "tier": "short",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
+def bump_memory_score(embedding_id, conn, user_id):
+    conn.execute(
+        """UPDATE memories SET frequency = frequency + 1, last_accessed = ?
+        WHERE user_id = ? AND embedding_id = ?""",
+        (datetime.now(timezone.utc).isoformat(), user_id, embedding_id),
     )
-    Chroma.from_documents(
-        documents=[doc],
-        embedding=embedding_model,
-        persist_directory=SHORT_TERM_DIR
-    )
-    print(f"[Memory] Stored new short-term memory for user {user_id}")
-
-
-# ==================== SCORING UPDATES ====================
-
-def bump_memory_score(embedding_id: str, conn):
-    """Increment frequency and update last_accessed when a memory is hit"""
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE memories
-        SET frequency = frequency + 1,
-            last_accessed = ?
-        WHERE embedding_id = ?
-    """, (datetime.now(timezone.utc), embedding_id))
     conn.commit()
 
 
-def maybe_promote(embedding_id: str, conn):
-    """Move a long-term memory back to short-term if it's being accessed again"""
-    cursor = conn.cursor()
-    cursor.execute("SELECT frequency, last_accessed FROM memories WHERE embedding_id = ?", (embedding_id,))
-    row = cursor.fetchone()
-    if not row:
-        return
-
-    frequency, last_accessed = row
-    if isinstance(last_accessed, str):
-        last_accessed = datetime.fromisoformat(last_accessed)
-
-    score = compute_score(frequency, last_accessed)
-    if score > SHORT_TERM_THRESHOLD:
-        cursor.execute("UPDATE memories SET tier = 'short' WHERE embedding_id = ?", (embedding_id,))
+def maybe_promote(embedding_id, conn, user_id):
+    row = conn.execute(
+        "SELECT frequency, last_accessed FROM memories WHERE user_id = ? AND embedding_id = ? AND tier = 'long'",
+        (user_id, embedding_id),
+    ).fetchone()
+    if row and compute_score(*row) > SHORT_TERM_THRESHOLD:
+        conn.execute(
+            "UPDATE memories SET tier = 'short' WHERE user_id = ? AND embedding_id = ?",
+            (user_id, embedding_id),
+        )
         conn.commit()
-        print(f"[Memory] Promoted {embedding_id} back to short-term (score={score:.3f})")
+        sync_memory_index(conn, user_id)
 
 
-# ==================== DEMOTION JOB ====================
-
-def demote_stale_memories(conn):
-    """
-    Run periodically — demote short-term memories that haven't been
-    accessed recently and have low scores down to long-term.
-    """
-    cursor = conn.cursor()
-    cursor.execute("SELECT embedding_id, frequency, last_accessed FROM memories WHERE tier = 'short'")
-    rows = cursor.fetchall()
-
+def demote_stale_memories(conn, user_id):
+    rows = conn.execute(
+        "SELECT embedding_id, frequency, last_accessed FROM memories WHERE user_id = ? AND tier = 'short'",
+        (user_id,),
+    ).fetchall()
     demoted = 0
+    now = datetime.now(timezone.utc)
     for embedding_id, frequency, last_accessed in rows:
-        if isinstance(last_accessed, str):
-            last_accessed = datetime.fromisoformat(last_accessed)
-        score = compute_score(frequency, last_accessed)
-        if score < SHORT_TERM_THRESHOLD:
-            cursor.execute("UPDATE memories SET tier = 'long' WHERE embedding_id = ?", (embedding_id,))
+        if (
+            (now - as_datetime(last_accessed)).days >= TIER_SHIFT_DAYS
+            and frequency < PROMOTION_THRESHOLD
+            and compute_score(frequency, last_accessed) < SHORT_TERM_THRESHOLD
+        ):
+            conn.execute(
+                "UPDATE memories SET tier = 'long' WHERE user_id = ? AND embedding_id = ?",
+                (user_id, embedding_id),
+            )
             demoted += 1
-
     conn.commit()
-    print(f"[Memory] Demoted {demoted} memories to long-term")
-    init_memory_db()
+    return demoted

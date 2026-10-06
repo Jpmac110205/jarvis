@@ -5,15 +5,17 @@ from dotenv import load_dotenv
 
 
 backend_dir = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(backend_dir, '.env'))
-print("DATABASE_URL loaded:", bool(os.getenv("DATABASE_URL")))
+load_dotenv(os.path.join(backend_dir, "..", ".env"))
 
 
 def get_connection():
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise RuntimeError("DATABASE_URL not set — check your .env file")
-    return psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
+    return psycopg2.connect(
+        db_url, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=10
+    )
+
 
 # ==================== TABLE SETUP ====================
 def create_table():
@@ -40,8 +42,10 @@ def create_table():
         );
     """
     cursor.execute(query)
+    cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_model TEXT")
     conn.commit()
     conn.close()
+
 
 # ==================== CREATE ====================
 def create_user(user, google_id):
@@ -53,16 +57,20 @@ def create_user(user, google_id):
         ) VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (google_id) DO NOTHING
     """
-    cursor.execute(query, (
-        google_id,
-        user.email,
-        user.display_name,
-        user.given_name,
-        user.family_name,
-        user.picture_url
-    ))
+    cursor.execute(
+        query,
+        (
+            google_id,
+            user.email,
+            user.display_name,
+            user.given_name,
+            user.family_name,
+            user.picture_url,
+        ),
+    )
     conn.commit()
     conn.close()
+
 
 # ==================== READ ====================
 def get_user_by_google_id(google_id):
@@ -73,6 +81,7 @@ def get_user_by_google_id(google_id):
     conn.close()
     return user
 
+
 def get_user_by_id(user_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -81,50 +90,53 @@ def get_user_by_id(user_id):
     conn.close()
     return user
 
+
 # ==================== UPDATE ====================
 def update_user(user_id, data):
-    conn = get_connection()        
-    cursor = conn.cursor()
-
-    query = """
-        UPDATE users
-        SET display_name  = %s,
-            email          = %s,
-            given_name     = %s,
-            family_name    = %s,
-            title          = %s,
-            location       = %s,
-            system_prompt  = %s,
-            picture_url    = %s,
-            tasks_number   = %s,
-            chats_number   = %s,
-            pdfs_number    = %s,
-            updated_at     = CURRENT_TIMESTAMP
-        WHERE id = %s
-    """
-    try: 
-        cursor.execute(query, (
-            data.get("display_name"),
-            data.get("email"),
-            data.get("given_name"),
-            data.get("family_name"),
-            data.get("title"),
-            data.get("location"),
-            data.get("system_prompt"),
-            data.get("picture_url"),
-            data.get("tasks_number", 0),
-            data.get("chats_number", 0),
-            data.get("pdfs_number", 0),
-            user_id
-        ))
-        print(f"[UserRepository] Updated user {user_id} with data: {data}")
+    allowed = {
+        "display_name",
+        "email",
+        "given_name",
+        "family_name",
+        "title",
+        "location",
+        "system_prompt",
+        "picture_url",
+        "selected_model",
+    }
+    fields = {key: value for key, value in data.items() if key in allowed}
+    if not fields:
+        return
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            assignments = ", ".join(f"{key} = %s" for key in fields)
+            cursor.execute(
+                f"UPDATE users SET {assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (*fields.values(), user_id),
+            )
         conn.commit()
-    except Exception as e:
-        print(f"[UserRepository] Error updating user {user_id}: {e}")
+    except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+
+
+def increment_counter(google_id, counter):
+    if counter not in {"chats_number", "pdfs_number"}:
+        raise ValueError("Unknown counter")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE users SET {counter} = COALESCE({counter}, 0) + 1 WHERE google_id = %s",
+                (google_id,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
 
 # ==================== INITIALIZE ====================
 if __name__ == "__main__":

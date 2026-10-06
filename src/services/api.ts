@@ -1,48 +1,64 @@
-import type { Message } from "../App";
+export const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(
+  /\/$/,
+  "",
+);
+export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+export function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("prodigy_session");
+  return token ? { "X-Session-Token": token } : {};
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    ...options,
+    credentials: "include",
+    signal:
+      options.signal ??
+      AbortSignal.timeout(
+        path === "/chat" ? 240000 : path === "/upload" ? 180000 : 30000,
+      ),
+    headers: { ...authHeaders(), ...options.headers },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new ApiError(
+      response.status,
+      typeof body.detail === "string"
+        ? body.detail
+        : `Request failed (${response.status}). Please try again.`,
+    );
+  }
+  return response.json() as Promise<T>;
+}
+
+export function connectGoogle() {
+  window.location.assign(apiUrl("/auth/google/login"));
+}
 
 export interface ChatResponse {
   reply: string;
   error: string | null;
+  route?: string;
 }
-
-/**
- * Send a message to the chat endpoint and get a response
- * @param message The user's message
- * @param history The conversation history
- * @returns The AI's reply
- */
-export async function sendChatMessage(
+export function sendChatMessage(
   message: string,
-  history: Message[]
+  requestId: string,
 ): Promise<ChatResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/chat`, {
-  method: "POST",
-  credentials: "include",  // ← send cookie
-  headers: {
-    "Content-Type": "application/json",
-    "X-User-ID": localStorage.getItem("user_id") ?? "",  // ← send user_id
-  },
-  body: JSON.stringify({
-    message,
-    history,
-  }),
-});
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data: ChatResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error sending chat message:", error);
-    return {
-      reply: "Sorry, I couldn't reach the backend. Please check if the server is running.",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+  return apiRequest("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, request_id: requestId }),
+  });
 }
-

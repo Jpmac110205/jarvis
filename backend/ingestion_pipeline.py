@@ -1,19 +1,11 @@
 import os
-import chromadb
-from langchain_community.document_loaders import TextLoader
-from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
 from dotenv import load_dotenv
+
 load_dotenv()
 
-# Chroma Cloud client — shared connection config
-chroma_client = chromadb.CloudClient(
-    api_key=os.getenv("CHROMA_API_KEY"),
-    tenant=os.getenv("CHROMA_TENANT"),
-    database=os.getenv("CHROMA_DATABASE"),
-)
+from storage.vector_store import get_store
 
 
 def load_document(file_path):
@@ -57,11 +49,15 @@ def get_chunk_params(total_chars: int, doc_type: str) -> tuple[int, int]:
         chunk_size = int(chunk_size * 1.15)
         chunk_overlap = int(chunk_overlap * 1.15)
 
-    print(f"[Chunker] doc_type={doc_type} | chars={total_chars:,} → chunk_size={chunk_size}, overlap={chunk_overlap}")
+    print(
+        f"[Chunker] doc_type={doc_type} | chars={total_chars:,} → chunk_size={chunk_size}, overlap={chunk_overlap}"
+    )
     return chunk_size, chunk_overlap
 
 
-def split_documents(documents, doc_type: str = "default", filename: str = "unknown", user_id: str = None):
+def split_documents(
+    documents, doc_type: str = "default", filename: str = "unknown", user_id: str = None
+):
     total_chars = sum(len(doc.page_content) for doc in documents)
     chunk_size, chunk_overlap = get_chunk_params(total_chars, doc_type)
 
@@ -75,48 +71,54 @@ def split_documents(documents, doc_type: str = "default", filename: str = "unkno
     chunks = splitter.split_documents(documents)
 
     for i, chunk in enumerate(chunks):
-        chunk.metadata.update({
-            "source":        filename,
-            "chunk_index":   i,
-            "total_chunks":  len(chunks),
-            "doc_type":      doc_type,
-            "chunk_size":    chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "total_chars":   total_chars,
-            "user_id":       user_id,
-        })
+        chunk.metadata.update(
+            {
+                "source": filename,
+                "chunk_index": i,
+                "total_chunks": len(chunks),
+                "doc_type": doc_type,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "total_chars": total_chars,
+                "user_id": user_id,
+            }
+        )
 
-    print(f"[Chunker] {len(documents)} doc(s) → {len(chunks)} chunks for user_id={user_id}")
+    print(
+        f"[Chunker] {len(documents)} doc(s) → {len(chunks)} chunks for user_id={user_id}"
+    )
     return chunks
 
 
 def create_vector_store(chunks):
-    print("Creating vector store and storing in Chroma Cloud...")
-    embedding_model = OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        openai_api_key=os.getenv("OPENAI_API_KEY")
-    )
-    vectorstore = Chroma.from_documents(
-        documents=chunks,
-        embedding=embedding_model,
-        client=chroma_client,
-        collection_name="prodigy_documents",   # must match retrieval_pipeline.py
-        collection_metadata={"hnsw:space": "cosine"},
-    )
-    print(f"[VectorStore] {len(chunks)} chunks persisted to Chroma Cloud.")
+    if not chunks:
+        raise ValueError("The document has no extractable text")
+    vectorstore = get_store("prodigy_documents")
+    import hashlib
+
+    ids = [
+        hashlib.sha256(
+            f"{chunk.metadata['user_id']}:{chunk.metadata.get('document_key', chunk.metadata['source'])}:{chunk.metadata['chunk_index']}:{chunk.page_content}".encode()
+        ).hexdigest()
+        for chunk in chunks
+    ]
+    vectorstore.add_documents(chunks, ids=ids)
     return vectorstore
 
 
 def ingest_file(file_path, doc_type: str = "default", user_id: str = None):
     filename = os.path.basename(file_path)
     documents = load_document(file_path)
-    chunks = split_documents(documents, doc_type=doc_type, filename=filename, user_id=user_id)
+    chunks = split_documents(
+        documents, doc_type=doc_type, filename=filename, user_id=user_id
+    )
     vectorstore = create_vector_store(chunks)
     return vectorstore
 
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) not in (2, 3):
         print("Usage: python ingestion_pipeline.py <path_to_file> [doc_type]")
         print("       doc_type: default | dense | notes")

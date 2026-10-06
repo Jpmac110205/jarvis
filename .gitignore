@@ -34,3 +34,9 @@ db/chroma_db/
 db/chroma_short_term/
 db/chroma_long_term/
 db/memory.db
+
+# Python runtime output and local verification artifacts
+__pycache__/
+*.py[cod]
+artifacts/
+!.env.example

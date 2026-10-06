@@ -1,305 +1,302 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { PlusIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
-
-
-export type ChatMessage = {
-  id: number;
-  author: "user" | "bot";
-  content: string;
-  timestamp: string;
-};
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowUpIcon,
+  DocumentTextIcon,
+  MicrophoneIcon,
+  PaperClipIcon,
+} from "@heroicons/react/24/outline";
+import type { Message } from "../../App";
+import { apiRequest, connectGoogle } from "../../services/api";
+import { useGoogleData } from "../../contexts/useGoogleData";
 
 export default function Chat({
   messages,
   input,
   onChange,
   onSend,
-  isTyping = false,
+  isTyping,
+  disabled,
+  historyLoading,
+  error,
 }: {
-  messages: ChatMessage[];
+  messages: Message[];
   input: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   onSend: () => void;
-  isTyping?: boolean;
+  isTyping: boolean;
+  disabled: boolean;
+  historyLoading: boolean;
+  error: string | null;
 }) {
-  const [uploadState, setUploadState] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [uploadError, setUploadError] = useState<string>("");
-
+  const { user, config, refreshProfile } = useGoogleData();
+  const end = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(
+    null,
+  );
+  const [copied, setCopied] = useState<number | null>(null);
   useEffect(() => {
-    if (uploadState === "success" || uploadState === "error") {
-      const timer = setTimeout(() => {
-        setUploadState("idle");
-        setUploadError("");
-      }, 3000);
-      return () => clearTimeout(timer);
+    end.current?.scrollIntoView({ behavior: "auto", block: "end" });
+  }, [messages.length, isTyping]);
+  useEffect(() => {
+    const element = textarea.current;
+    if (element) {
+      element.style.height = "auto";
+      element.style.height = `${Math.min(element.scrollHeight, 180)}px`;
     }
-  }, [uploadState]);
-
-  const handleUpload = async (file: File) => {
-    if (!file.name.endsWith(".pdf")) {
-      setUploadError("Only PDF files are supported.");
-      setUploadState("error");
+  }, [input]);
+  useEffect(() => {
+    if (copied === null) return;
+    const timer = setTimeout(() => setCopied(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  async function upload(file: File) {
+    if (!/\.(pdf|txt)$/i.test(file.name)) {
+      setNotice({ text: "Choose a PDF or text document.", error: true });
       return;
     }
-
-    setUploadState("loading");
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: formData,
+    if (config && file.size > config.max_upload_bytes) {
+      setNotice({
+        text: `Choose a file under ${Math.round(config.max_upload_bytes / 1048576)} MB.`,
+        error: true,
       });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ detail: "Unknown error" }));
-        setUploadError(errorData.detail || `Upload failed (${res.status})`);
-        setUploadState("error");
-      } else {
-        setUploadState("success");
-      }
-    } catch (e) {
-      setUploadError("Network error — could not reach server.");
-      setUploadState("error");
+      return;
     }
-  };
-
-  return (
-    <div className="flex-1 w-full max-w-3xl flex flex-col overflow-hidden relative">
-      {/* Toast notifications restyled to match Prodigy premium notifications */}
-      {uploadState === "loading" && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0c0c10] border border-[rgba(59,130,246,0.3)] text-[#f0f0f5] px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-slide-down">
-          <div className="w-4 h-4 rounded-full border-2 border-[rgba(59,130,246,0.15)] border-t-[#3b82f6] animate-spin" />
-          <span className="text-xs font-medium tracking-wide">Syncing vector embeddings...</span>
-        </div>
-      )}
-      {uploadState === "success" && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0c0c10] border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 animate-slide-down">
-          <span className="text-sm font-semibold">✓</span>
-          <span className="text-xs font-medium tracking-wide">PDF registered in knowledge base permanently.</span>
-        </div>
-      )}
-      {uploadState === "error" && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#0c0c10] border border-red-500/30 text-red-400 px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 animate-slide-down">
-          <span className="text-sm font-semibold">✗</span>
-          <span className="text-xs font-medium tracking-wide">{uploadError}</span>
-        </div>
-      )}
-      
-      <ChatPanel messages={messages} isTyping={isTyping} />
-      <ChatInput
-        input={input}
-        onChange={onChange}
-        onSend={onSend}
-        handleUpload={handleUpload}
-        uploadState={uploadState}
-      />
-    </div>
-  );
-}
-
-/* --------- Chat Panel Frame (Internal) --------- */
-function ChatPanel({ messages, isTyping }: { messages: ChatMessage[]; isTyping: boolean }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-  }, [messages.length, isTyping]);
-
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!copiedId) return;
-    const t = setTimeout(() => setCopiedId(null), 1500);
-    return () => clearTimeout(t);
-  }, [copiedId]);
-
-  const handleCopy = async (text: string, id: number) => {
+    setUploading(true);
+    setNotice(null);
+    const body = new FormData();
+    body.append("file", file);
     try {
-      await navigator.clipboard.writeText(text);
-      setCopiedId(id.toString());
-    } catch (e) {
-      console.warn('copy failed', e);
+      await apiRequest("/upload", { method: "POST", body });
+      setNotice({
+        text: `${file.name} is ready. Ask a question about it whenever you need.`,
+        error: false,
+      });
+      await refreshProfile();
+    } catch (cause) {
+      setNotice({
+        text:
+          cause instanceof Error
+            ? cause.message
+            : "Upload failed. Please try again.",
+        error: true,
+      });
+    } finally {
+      setUploading(false);
     }
-  };
-
+  }
+  async function copy(message: Message) {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(message.id);
+    } catch {
+      setNotice({
+        text: "Your browser couldn't copy this message. Select the text to copy it.",
+        error: true,
+      });
+    }
+  }
   return (
-    <div ref={containerRef} className="flex-1 px-6 py-8 overflow-y-auto space-y-6 scrollbar-thin">
-      {messages.map((msg) => (
-        <div key={msg.id} className="w-full animate-[fadeUp_0.4s_ease_both]">
-          {msg.author === 'user' ? (
-            <div className="flex justify-end">
-              <div className="max-w-[85%] bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.18)] rounded-2xl px-5 py-3.5 text-sm text-[#f0f0f5] shadow-sm font-light leading-relaxed">
-                <div className="flex items-center gap-3 mb-2 opacity-50">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-[#3b82f6]">Secure Node</div>
-                  <div className="text-[9px] font-mono">{msg.timestamp}</div>
-                </div>
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+    <div className="chat">
+      <div
+        className="chat-scroll"
+        aria-label="Conversation"
+        aria-busy={historyLoading}
+      >
+        {historyLoading ? (
+          <p className="muted loading-message" role="status">
+            Loading your conversation…
+          </p>
+        ) : (
+          messages.length === 0 && (
+            <div className="chat-welcome">
+              <span className="eyebrow">Your personal assistant</span>
+              <h2>
+                {user
+                  ? `Good to see you, ${user.display_name.split(" ")[0]}.`
+                  : "Make room for what matters."}
+              </h2>
+              <p>
+                Think through an idea, find something in your documents, or get
+                a clearer view of your day. Prodigy keeps useful context close.
+              </p>
+              {!user && (
+                <button className="button primary" onClick={connectGoogle}>
+                  Sign in with Google
+                </button>
+              )}
+              <div className="prompt-grid">
+                {[
+                  {
+                    title: "Plan your day",
+                    prompt:
+                      "What's on my calendar today, and which tasks should I focus on?",
+                    icon: "01",
+                  },
+                  {
+                    title: "Ask your documents",
+                    prompt:
+                      "Summarize the key points from my uploaded documents.",
+                    icon: "02",
+                  },
+                  {
+                    title: "Pick up a thought",
+                    prompt:
+                      "What have we discussed recently? Help me decide the next steps.",
+                    icon: "03",
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.title}
+                    className="prompt-card"
+                    onClick={() => {
+                      onChange(item.prompt);
+                      textarea.current?.focus();
+                    }}
+                    disabled={disabled}
+                  >
+                    <span className="prompt-number">{item.icon}</span>
+                    <strong>{item.title}</strong>
+                    <span>{item.prompt}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="welcome-note">
+                <DocumentTextIcon />
+                <span>
+                  Upload a PDF or text document with the attachment button. Your
+                  document knowledge stays linked to your account.
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="flex justify-start">
-              <div className="relative max-w-[90%] w-full">
-                {/* Visual anchor line to match Prodigy cyber look */}
-                <div className="absolute left-0 top-0 h-full w-[1.5px] bg-gradient-to-b from-[#3b82f6] to-transparent opacity-60" />
-                
-                <div className="pl-6 pr-5 pb-5 pt-4 bg-[#0c0c10]/40 border border-white/5 rounded-r-2xl ml-3 shadow-xl transition-all hover:bg-[#0c0c10]/60 hover:border-white/10">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3.5">
-                      <div className="h-9 w-9 rounded-xl bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.15)] flex items-center justify-center p-0.5">
-                        <img src="/prodigyp.png" alt="Prodigy Logo" className="h-full w-full object-contain rounded-lg" onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }} />
-                        <span className="font-['Syne'] font-extrabold text-[#3b82f6] text-sm">P</span>
-                      </div>
-                      <div>
-                        <div className="text-sm font-['Syne'] font-bold text-[#f0f0f5]">PRODIGY.</div>
-                        <div className="text-[9px] text-[#7a7a8c] font-mono">{msg.timestamp}</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleCopy(msg.content, msg.id)}
-                        className="text-[10px] tracking-wide text-[#7a7a8c] hover:text-[#f0f0f5] transition px-2.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5"
-                      >
-                        {copiedId === msg.id.toString() ? 'Copied' : 'Copy'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap text-[#c8c8d4] font-light">
-                    {msg.content}
-                  </div>
-                </div>
+          )
+        )}
+        <div className="message-list">
+          {messages.map((message) => (
+            <article key={message.id} className={`message ${message.author}`}>
+              <div className="message-heading">
+                <span
+                  className={`message-avatar ${message.author === "bot" ? "assistant-avatar" : ""}`}
+                >
+                  {message.author === "bot"
+                    ? "p"
+                    : user?.display_name.charAt(0) || "You"}
+                </span>
+                <strong>{message.author === "bot" ? "Prodigy" : "You"}</strong>
+                <time>{message.timestamp}</time>
+                {message.author === "bot" && (
+                  <button
+                    className="text-button copy-message"
+                    onClick={() => void copy(message)}
+                  >
+                    {copied === message.id ? "Copied" : "Copy"}
+                  </button>
+                )}
               </div>
+              <div className="message-body">{message.content}</div>
+            </article>
+          ))}
+          {isTyping && (
+            <div className="thinking" role="status">
+              <span className="status-dot" />
+              Prodigy is thinking…
             </div>
           )}
+          <div ref={end} />
         </div>
-      ))}
-      {isTyping && <TypingIndicator />}
-    </div>
-  );
-}
-
-/* --------- Chat Input Bar (Internal) --------- */
-function ChatInput({
-  input,
-  onChange,
-  onSend,
-  handleUpload,
-  uploadState,
-}: {
-  input: string;
-  onChange: (v: string) => void;
-  onSend: () => void;
-  handleUpload: (file: File) => void;
-  uploadState: "idle" | "loading" | "success" | "error";
-}) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useLayoutEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.max(ta.scrollHeight, 40)}px`;
-  }, [input]);
-
-  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
-    const ta = e.currentTarget;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.max(ta.scrollHeight, 40)}px`;
-    onChange(ta.value);
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleUpload(files[0]);
-      e.target.value = "";
-    }
-  }
-
-  return (
-    <footer className="px-6 py-4 bg-[#050507]/80 backdrop-blur-md border-t border-[rgba(59,130,246,0.15)]">
-      <div className="flex items-center gap-3 bg-[#0c0c10] border border-[rgba(59,130,246,0.15)] rounded-2xl px-4 py-3 shadow-2xl focus-within:border-[rgba(59,130,246,0.45)] focus-within:shadow-[0_0_20px_rgba(59,130,246,0.06)] transition-all duration-300">
-        
-        {/* Attachment input hidden */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept=".pdf"
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
-        
-        {/* Content insertion button */}
-        <button
-          type="button"
-          disabled={uploadState === "loading"}
-          className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-[rgba(59,130,246,0.15)] transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
-          title="Add PDF context permanent memory"
-          onClick={() => fileInputRef.current && fileInputRef.current.click()}
-        >
-          <PlusIcon className="h-4 w-4 text-[#7a7a8c] hover:text-[#3b82f6] transition-colors" />
-        </button>
-
-        {/* Dynamic growing text input container */}
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onInput={handleInput}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
-            }
-          }}
-          placeholder="Ask Prodigy about your calendar, tasks or memory..."
-          rows={1}
-          style={{ height: "40px" }}
-          className="flex-1 min-h-[40px] max-h-[160px] bg-transparent text-sm leading-6 outline-none placeholder:text-[#7a7a8c] text-[#f0f0f5] font-light resize-none overflow-y-auto py-1 scrollbar-none"
-        />
-
-        {/* Custom Dictation controls */}
-        <button
-          type="button"
-          className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-[rgba(59,130,246,0.15)] transition-all duration-200 flex-shrink-0"
-          title="Transcribe interface"
-        >
-          <MicrophoneIcon className="h-4 w-4 text-[#7a7a8c] hover:text-[#3b82f6] transition-colors" />
-        </button>
-
-        {/* Submission module */}
-        <button
-          onClick={onSend}
-          disabled={!input.trim()}
-          className="ml-1 px-5 py-2.5 text-xs tracking-wide uppercase font-semibold rounded-xl bg-[#3b82f6] text-white shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-200 disabled:opacity-30 disabled:shadow-none hover:bg-[#2563eb] disabled:cursor-not-allowed flex-shrink-0"
-        >
-          Send
-        </button>
       </div>
-    </footer>
-  );
-}
-
-/* --------- Loading Indicator (Internal) --------- */
-function TypingIndicator() {
-  return (
-    <div className="flex justify-start animate-pulse">
-      <div className="max-w-[400px] w-full bg-[#0c0c10]/40 border border-white/5 rounded-2xl p-4 ml-3 shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="h-5 w-5 rounded-lg bg-white/5 animate-pulse" />
-          <div className="flex gap-1.5 items-center">
-            <span className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="composer-area">
+        {error && (
+          <div className="notice error" role="alert">
+            {error} Your draft is still here.
           </div>
+        )}
+        {notice && (
+          <div
+            className={`notice ${notice.error ? "error" : ""}`}
+            role={notice.error ? "alert" : "status"}
+          >
+            {notice.text}
+            <button
+              className="text-button"
+              onClick={() => setNotice(null)}
+              aria-label="Dismiss upload notice"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        {uploading && (
+          <p className="muted" role="status">
+            Preparing your document…
+          </p>
+        )}
+        <div className="composer">
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".pdf,.txt"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void upload(file);
+              event.target.value = "";
+            }}
+          />
+          <button
+            className="icon-button"
+            onClick={() => fileInput.current?.click()}
+            aria-label="Upload PDF or text document"
+            disabled={disabled || uploading}
+          >
+            <PaperClipIcon />
+          </button>
+          <textarea
+            ref={textarea}
+            value={input}
+            rows={1}
+            aria-label="Message Prodigy"
+            placeholder={
+              user
+                ? "Ask a question or share a thought…"
+                : "Sign in to start a conversation"
+            }
+            disabled={disabled || isTyping}
+            maxLength={20000}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                onSend();
+              }
+            }}
+          />
+          <button
+            className="icon-button voice-control"
+            disabled
+            title="Voice input is not available yet"
+            aria-label="Voice input unavailable"
+          >
+            <MicrophoneIcon />
+          </button>
+          <button
+            className="send-button"
+            aria-label="Send message"
+            onClick={onSend}
+            disabled={disabled || isTyping || !input.trim()}
+          >
+            <ArrowUpIcon />
+          </button>
+        </div>
+        <div className="composer-caption">
+          <span>Enter to send · Shift + Enter for a new line</span>
+          <span>Check important details in the original source.</span>
         </div>
       </div>
     </div>

@@ -11,7 +11,10 @@
     "dev:db": "brew services start postgresql@14 && echo 'PostgreSQL started.'",
     "dev:frontend": "vite",
     "dev:backend": "npm run backend:server",
-"backend:server": "cd backend && ../venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"  },
+    "backend:server": "cd backend && ../venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload",
+    "test:ui": "npm run build && node tests/frontend-smoke.cjs",
+    "test:backend": "cd backend && ../venv/bin/python -m unittest discover -s tests -v"
+  },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "react": "^19.2.0",
@@ -30,6 +33,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "playwright": "^1.63.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
     "typescript": "~5.9.3",
