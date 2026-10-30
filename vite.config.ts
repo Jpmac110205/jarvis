@@ -2,12 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: '/',
   plugins: [react()],
   envDir: './backend',
+  // Development API calls go through this server's proxy.
+  define: command === 'serve' ? { 'import.meta.env.VITE_BACKEND_URL': JSON.stringify('') } : {},
   server: {
-  port: 5173,
+  port: 8000,
+  strictPort: true,
   proxy: {
     '^/$':      { target: 'http://localhost:8080', changeOrigin: true }, // exact "/" only
     '/upload':  { target: 'http://localhost:8080', changeOrigin: true },
@@ -18,6 +21,10 @@ export default defineConfig({
     '/users':   { target: 'http://localhost:8080', changeOrigin: true },
     '/export':  { target: 'http://localhost:8080', changeOrigin: true },
     '/privacy': { target: 'http://localhost:8080', changeOrigin: true },
+    '/health':  { target: 'http://localhost:8080', changeOrigin: true },
+    '/config':  { target: 'http://localhost:8080', changeOrigin: true },
+    '/conversation': { target: 'http://localhost:8080', changeOrigin: true },
+    '/static':  { target: 'http://localhost:8080', changeOrigin: true },
     // no '/app' entry — let Vite serve the live dev app here instead
   }
 },
@@ -25,4 +32,4 @@ export default defineConfig({
     outDir: 'backend/dist',
     emptyOutDir: true
   },
-})
+}))

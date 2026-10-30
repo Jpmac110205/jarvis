@@ -39,8 +39,9 @@ from ingestion_pipeline import load_document, split_documents, create_vector_sto
 from retrieval_pipeline import search_documents
 
 logger = logging.getLogger(__name__)
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173/app")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8080/auth/google/callback")
+PUBLIC_URL = (os.getenv("RENDER_EXTERNAL_URL") or "http://localhost:8000").rstrip("/")
+FRONTEND_URL = os.getenv("FRONTEND_URL") or PUBLIC_URL + "/app"
+REDIRECT_URI = os.getenv("REDIRECT_URI") or PUBLIC_URL + "/auth/google/callback"
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 PRODUCTION = os.getenv("ENVIRONMENT") == "production" or FRONTEND_URL.startswith(

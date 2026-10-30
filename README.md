@@ -11,6 +11,36 @@
 
 ---
 
+## Running locally and on Render
+
+With Docker Desktop running and credentials configured in `backend/.env`, run:
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:8000. This starts Vite on port 8000 and the same FastAPI
+backend used in production in Docker on port 8080. Vite forwards API requests to
+that backend. Frontend and Python edits reload automatically. Stop with Ctrl+C;
+use `docker compose down` to remove the development container. Kubernetes and
+port forwarding are not needed for this workflow; stop any port forward using
+port 8000 before starting development.
+
+Register `http://localhost:8000/auth/google/callback` in your Google OAuth client's
+authorized redirect URIs. Compose sets the local callback and frontend URLs.
+Keep `VITE_BACKEND_URL` blank so requests use the current site's origin.
+
+Render uses `render.yaml` and the Dockerfile to build the frontend and serve it
+alongside the API in one web service. Configure the credentials listed in
+`backend/.env.example` in Render. By default the app derives its public URLs from
+Render's `RENDER_EXTERNAL_URL`; register
+`https://YOUR-SERVICE.onrender.com/auth/google/callback` with Google too.
+For a custom domain, set `FRONTEND_URL=https://YOUR-DOMAIN/app` and
+`REDIRECT_URI=https://YOUR-DOMAIN/auth/google/callback`. Remove stale localhost
+values from Render's `FRONTEND_URL`, `REDIRECT_URI`, and `CORS_ORIGINS` settings.
+Each environment runs its own backend process using the same application code.
+
 ## Overview
 
 Most AI assistants are stateless. Every conversation starts from scratch, uploaded documents disappear after the session, and they have little understanding of a user's long-term context.
