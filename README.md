@@ -62,10 +62,31 @@ Upload PDFs, notes, or documents once.
 Prodigy automatically:
 
 - Extracts text
+- Saves the complete extracted text in your account database
+- Attaches it to your question, with a preview and × to remove it
 - Dynamically chunks documents
 - Generates embeddings
 - Stores vectors in ChromaDB
 - Retrieves relevant context for future conversations
+
+PDF, `.txt`, and `.md` uploads support full-text questions. Attached documents
+stay with your questions until removed; saved documents can be reattached.
+The model receives all extracted text, subject to an explicit input budget,
+rather than only matching chunks. PDF images and layout are not included.
+
+Alongside the three memory tiers, an account-specific `user.md` records explicit
+facts, preferences, and projects from your messages. It updates after successful
+chat exchanges and accompanies future questions. Review, edit, download, clear,
+or pause automatic updates in **Settings → Your memory**. The Markdown is stored
+in PostgreSQL in production so it survives Render restarts.
+
+See [document attachments and user memory](docs/document-memory.md) for rollout,
+configuration, and limits. Older uploads must be re-uploaded to restore full text.
+
+Replies stream as they are generated. Markdown updates, summaries and vector
+maintenance run in a durable worker so they do not delay a completed answer.
+`npm run dev` starts this worker locally. Production deployments must also run the
+worker declared in `render.yaml`; see [response performance](docs/response-performance.md).
 
 Example:
 

@@ -28,3 +28,47 @@ services:
         sync: false
       - key: CLIENT_SECRET
         sync: false
+  - type: worker
+    name: prodigy-memory-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: python -m scripts.memory_worker
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: DATABASE_URL
+      - key: OPENAI_API_KEY
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: OPENAI_API_KEY
+      - key: OPENAI_MODEL
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: OPENAI_MODEL
+      - key: EMBEDDING_MODEL
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: EMBEDDING_MODEL
+      - key: CHROMA_API_KEY
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: CHROMA_API_KEY
+      - key: CHROMA_TENANT
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: CHROMA_TENANT
+      - key: CHROMA_DATABASE
+        fromService:
+          type: web
+          name: prodigy
+          envVarKey: CHROMA_DATABASE

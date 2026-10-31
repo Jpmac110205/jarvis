@@ -2,44 +2,79 @@
 
 from datetime import datetime, timezone
 import hashlib
+import json
 
 SUMMARY_MESSAGES = 20  # ten complete user/assistant exchanges
 CONTEXT_MESSAGES = 10
 
 
 def get_messages(conn, user_id, limit=None):
-    sql = "SELECT id, role, content, created_at FROM conversation_messages WHERE user_id = ? ORDER BY id DESC"
+    sql = "SELECT id, role, content, created_at, attachments FROM conversation_messages WHERE user_id = ? ORDER BY id DESC"
     parameters = (user_id,)
     if limit is not None:
         sql += " LIMIT ?"
         parameters += (limit,)
     rows = conn.execute(sql, parameters).fetchall()
     return [
-        {"id": r[0], "role": r[1], "content": r[2], "created_at": str(r[3])}
+        {
+            "id": r[0],
+            "role": r[1],
+            "content": r[2],
+            "created_at": str(r[3]),
+            "attachments": json.loads(r[4]),
+        }
         for r in reversed(rows)
     ]
 
 
 def append_exchange(
-    conn, user_id, question, answer, request_id=None, route="LLM", track_usage=False
+    conn,
+    user_id,
+    question,
+    answer,
+    request_id=None,
+    route="LLM",
+    track_usage=False,
+    attachments=None,
+    maintenance_model=None,
+    memory_accesses=None,
 ):
     now = datetime.now(timezone.utc).isoformat()
     try:
         for role, content in (("user", question), ("assistant", answer)):
             conn.execute(
-                "INSERT INTO conversation_messages (user_id, role, content, created_at) VALUES (?, ?, ?, ?)",
-                (user_id, role, content, now),
+                "INSERT INTO conversation_messages (user_id, role, content, created_at, attachments) VALUES (?, ?, ?, ?, ?)",
+                (
+                    user_id,
+                    role,
+                    content,
+                    now,
+                    json.dumps(attachments or []) if role == "user" else "[]",
+                ),
             )
         if request_id:
             conn.execute(
-                "INSERT INTO chat_responses (user_id, request_id, message, reply, route) VALUES (?, ?, ?, ?, ?)",
-                (user_id, str(request_id), question, answer, route),
+                "INSERT INTO chat_responses (user_id, request_id, message, reply, route, attachment_keys) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    user_id,
+                    str(request_id),
+                    question,
+                    answer,
+                    route,
+                    json.dumps(sorted(a["document_key"] for a in (attachments or []))),
+                ),
             )
         if track_usage and getattr(conn, "postgres", False):
             conn.execute(
                 "UPDATE users SET chats_number = COALESCE(chats_number, 0) + 1 WHERE google_id = ?",
                 (user_id,),
             )
+        if maintenance_model:
+            from storage.memory_manager import touch_memories
+            from storage.job_repository import enqueue
+
+            touch_memories(conn, user_id, memory_accesses or [])
+            enqueue(conn, user_id, maintenance_model)
         conn.commit()
     except Exception:
         conn.rollback()

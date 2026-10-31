@@ -594,9 +594,11 @@
         <div class="subsection">
           <h3>Documents and files</h3>
           <p>
-            You may upload PDFs and notes. These are parsed, chunked, and stored
-            as vector embeddings in a ChromaDB vector database. File content may
-            be retained to support accurate retrieval and question-answering.
+            Uploaded PDFs, text and Markdown are retained as complete extracted
+            text in your account database and indexed in Chroma Cloud. Attached
+            documents are sent in full to the AI provider with your question.
+            Removing an attachment excludes its full text from the question but
+            does not delete the saved document.
           </p>
         </div>
 
@@ -606,7 +608,10 @@
             Prodigy stores your conversation history to support persistent
             memory across sessions. This includes messages you send and
             AI-generated responses. Conversation summaries may also be stored in
-            the vector database to support long-term memory retrieval.
+            the vector database to support long-term memory retrieval. A separate
+            user.md memory records facts and preferences from your messages. You
+            can review, edit, clear, download or pause updates to this Markdown in
+            Settings.
           </p>
         </div>
 
@@ -769,10 +774,11 @@
           <h2>Data storage &amp; security</h2>
         </div>
         <p>
-          Production account information, conversations and memory summaries are
-          stored in PostgreSQL. Document content and memory embeddings are
-          stored in Chroma Cloud. Device preferences and optional unsent drafts
-          are stored in your browser.
+          Production account information, conversations, full extracted document
+          text, user.md and memory summaries are stored in PostgreSQL. Document
+          chunks and memory embeddings are stored in Chroma Cloud. Device
+          preferences and optional unsent drafts, including attachment IDs and
+          filenames, are stored in your browser.
         </p>
         <div class="callout">
           <p>

@@ -70,6 +70,32 @@ class MemoryTests(unittest.TestCase):
         )
         self.conn.commit()
 
+    def test_tier_changed_during_indexing_remains_pending_until_repaired(self):
+        self.store()
+        self.age()
+        memory.demote_stale_memories(self.conn, "alice")
+        target = self.stores[memory.LONG_COLLECTION]
+        original_add = target.add_documents
+
+        def concurrent_access(docs, ids):
+            original_add(docs, ids)
+            memory.touch_memories(self.conn, "alice", ["m1"])
+            self.conn.commit()
+
+        with patch.object(target, "add_documents", side_effect=concurrent_access):
+            memory.sync_memory_index(self.conn, "alice")
+        self.assertEqual(
+            self.conn.execute("SELECT tier, indexed_tier FROM memories").fetchone(),
+            ("short", None),
+        )
+        memory.sync_memory_index(self.conn, "alice")
+        self.assertEqual(
+            self.conn.execute("SELECT tier, indexed_tier FROM memories").fetchone(),
+            ("short", "short"),
+        )
+        self.assertIn("alice:m1", self.stores[memory.SHORT_COLLECTION].documents)
+        self.assertNotIn("alice:m1", target.documents)
+
     def test_persistent_conversations_are_user_scoped_and_bounded(self):
         for i in range(12):
             conversations.append_exchange(self.conn, "alice", f"question {i}", "answer")

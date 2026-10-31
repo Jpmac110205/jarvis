@@ -31,6 +31,12 @@ class ApiTests(unittest.TestCase):
             side_effect=lambda: get_memory_connection(self.db),
         )
         self.connection.start()
+        self.vector_context = patch.object(
+            main,
+            "vector_context",
+            return_value={"hits": [], "documents": [], "unavailable": False},
+        )
+        self.vector_context.start()
         self.headers = {"X-Session-Token": "valid-session"}
         self.user = {
             "id": 1,
@@ -40,13 +46,21 @@ class ApiTests(unittest.TestCase):
         }
 
     def tearDown(self):
+        self.vector_context.stop()
         self.connection.stop()
         self.session.stop()
         self.client.close()
         self.temp.cleanup()
 
     def test_supplied_user_id_does_not_authenticate(self):
-        for route in ["/conversation", "/events", "/tasks", "/users/1"]:
+        for route in [
+            "/conversation",
+            "/events",
+            "/tasks",
+            "/users/1",
+            "/documents",
+            "/memory/user",
+        ]:
             self.assertEqual(
                 self.client.get(route, headers={"X-User-ID": "alice"}).status_code, 401
             )

@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "dev": "concurrently --kill-others \"npm:dev:docker\" \"npm:dev:frontend\"",
-    "dev:docker": "docker compose up --build backend",
+    "dev:docker": "docker compose up --build backend memory-worker",
+    "memory:worker": "cd backend && ../venv/bin/python -m scripts.memory_worker",
     "dev:frontend": "vite",
     "dev:backend": "npm run backend:server",
     "backend:server": "cd backend && ../venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload",
@@ -18,7 +19,9 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

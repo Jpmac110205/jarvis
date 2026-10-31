@@ -13,12 +13,14 @@ def load_document(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"The file {file_path} does not exist.")
 
-    if file_path.endswith(".pdf"):
+    if file_path.lower().endswith(".pdf"):
         loader = PyPDFLoader(file_path)
-    elif file_path.endswith(".txt"):
-        loader = TextLoader(file_path)
+    elif file_path.lower().endswith((".txt", ".md")):
+        loader = TextLoader(file_path, encoding="utf-8-sig")
     else:
-        raise ValueError(f"Unsupported file type: {file_path}. Expected .pdf or .txt")
+        raise ValueError(
+            f"Unsupported file type: {file_path}. Expected .pdf, .txt or .md"
+        )
 
     documents = loader.load()
     print(f"[Loader] Loaded {len(documents)} page(s) from {file_path}")

@@ -71,6 +71,29 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     user_id TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS content TEXT;
+ALTER TABLE document_uploads ADD COLUMN IF NOT EXISTS indexed INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE chat_responses ADD COLUMN IF NOT EXISTS attachment_keys TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE conversation_messages ADD COLUMN IF NOT EXISTS attachments TEXT NOT NULL DEFAULT '[]';
+CREATE TABLE IF NOT EXISTS user_memory (
+    user_id TEXT PRIMARY KEY,
+    markdown TEXT NOT NULL DEFAULT '',
+    revision INTEGER NOT NULL DEFAULT 0,
+    auto_update INTEGER NOT NULL DEFAULT 1,
+    last_message_id BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS memory_jobs (
+    user_id TEXT PRIMARY KEY, generation BIGINT NOT NULL DEFAULT 1,
+    model TEXT NOT NULL, run_after DOUBLE PRECISION NOT NULL DEFAULT 0,
+    lease_token TEXT, lease_until DOUBLE PRECISION NOT NULL DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS memory_jobs_ready ON memory_jobs(run_after, lease_until);
+CREATE TABLE IF NOT EXISTS context_cache (
+    user_id TEXT NOT NULL, cache_key TEXT NOT NULL, payload TEXT NOT NULL,
+    expires_at DOUBLE PRECISION NOT NULL, PRIMARY KEY (user_id, cache_key)
+);
 CREATE INDEX IF NOT EXISTS auth_sessions_expiry ON auth_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS user_tokens (

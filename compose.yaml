@@ -1,5 +1,6 @@
 services:
   backend:
+    image: prodigy-backend
     build:
       context: .
       dockerfile: Dockerfile
@@ -21,5 +22,20 @@ services:
       - --port
       - "8080"
       - --reload
+    volumes:
+      - ./backend:/app/backend
+  memory-worker:
+    image: prodigy-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: development
+    command: ["python", "-m", "scripts.memory_worker"]
+    init: true
+    depends_on:
+      - backend
     volumes:
       - ./backend:/app/backend

@@ -26,7 +26,7 @@ COPY public ./public
 COPY *.config.* ./
 
 # Compile React into production static files
-# Default Vite output: /app/dist
+# Vite is configured to output to /app/backend/dist
 RUN npm run build
 
 
@@ -53,7 +53,7 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend/ ./
 
 # Copy compiled React files from Stage 1
-COPY --from=frontend /app/dist ./dist
+COPY --from=frontend /app/backend/dist ./dist
 
 # Create a non-root user and give it ownership
 RUN groupadd --gid 1000 app \

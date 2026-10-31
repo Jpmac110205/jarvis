@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const http = require("node:http");
 const root = path.resolve(__dirname, "..");
 const artifactDir = path.join(root, "artifacts", "ui");
 fs.mkdirSync(artifactDir, { recursive: true });
@@ -48,7 +49,73 @@ let failChat = false,
   loggedIn = true;
 const apiRequests = [];
 const consoleErrors = [];
+const document = {
+  document_key: "a".repeat(64),
+  filename: "notes.md",
+  characters: 42,
+  full_text_available: true,
+  indexed: true,
+};
+let userMemory = {
+  markdown: "# Preferences\n- Concise replies",
+  revision: 1,
+  auto_update: true,
+  updated_at: null,
+};
+let streamMode = "normal";
+let replyText = "Here is the next step for your project.";
+let releaseStream;
+const receipts = new Map();
+const streamServer = http.createServer(async (request, response) => {
+  response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:4185");
+  response.setHeader("Access-Control-Allow-Credentials", "true");
+  response.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type,X-Session-Token,Accept",
+  );
+  response.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  if (request.method === "OPTIONS") {
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  let body = "";
+  for await (const part of request) body += part;
+  const data = JSON.parse(body);
+  response.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+  });
+  const send = (event) =>
+    response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  if (receipts.has(data.request_id)) {
+    send(receipts.get(data.request_id));
+    response.end();
+    return;
+  }
+  const reply = replyText;
+  const completed = {
+    type: "done",
+    reply,
+    error: null,
+    memory_status: "queued",
+  };
+  send({ type: "ready" });
+  send({ type: "delta", text: reply.slice(0, 17) });
+  const finish = () => {
+    send({ type: "delta", text: reply.slice(17) });
+    receipts.set(data.request_id, completed);
+    if (streamMode !== "drop-confirmation") send(completed);
+    response.end();
+  };
+  if (streamMode === "hold") releaseStream = finish;
+  else finish();
+});
 (async () => {
+  await new Promise((resolve, reject) => {
+    streamServer.once("error", reject);
+    streamServer.listen(4186, "127.0.0.1", resolve);
+  });
   for (let attempt = 0; attempt < 50; attempt++) {
     try {
       const response = await fetch("http://127.0.0.1:4185/app");
@@ -100,6 +167,8 @@ const consoleErrors = [];
         "/auth/logout",
         "/export/conversation",
         "/upload",
+        "/documents",
+        "/memory/user",
       ].includes(path)
     )
       apiRequests.push({
@@ -107,6 +176,10 @@ const consoleErrors = [];
         method: request.method(),
         headers: request.headers(),
         search: url.search,
+        body:
+          request.method() === "POST" && path === "/chat"
+            ? JSON.parse(request.postData())
+            : null,
       });
     if (path === "/auth/status")
       return json({
@@ -116,6 +189,20 @@ const consoleErrors = [];
     if (path === "/config") return json(config);
     if (path === "/health") return json({ status: "ok" });
     if (path === "/conversation") return json({ messages: [] });
+    if (path === "/documents") return json({ documents: [document] });
+    if (path === `/documents/${document.document_key}`)
+      return json({
+        ...document,
+        content: "# Complete notes\nBeginning, middle and end.",
+      });
+    if (path === "/memory/user") {
+      if (request.method() === "PUT")
+        userMemory = {
+          ...JSON.parse(request.postData()),
+          revision: userMemory.revision + 1,
+        };
+      return json(userMemory);
+    }
     if (path === "/events") {
       const date = (
         url.searchParams.get("time_min") || new Date().toISOString()
@@ -159,10 +246,7 @@ const consoleErrors = [];
     if (path === "/chat")
       return failChat
         ? json({ detail: "Service temporarily unavailable." }, 503)
-        : json({
-            reply: "Here is the next step for your project.",
-            error: null,
-          });
+        : route.continue({ url: "http://127.0.0.1:4186/chat" });
     if (path === "/users/1" && request.method() === "PUT") {
       Object.assign(user, JSON.parse(request.postData()));
       return json(user);
@@ -173,8 +257,7 @@ const consoleErrors = [];
     }
     if (path === "/export/conversation")
       return json({ data: { conversation_history: [] } });
-    if (path === "/upload")
-      return json({ status: "ingested", filename: "notes.txt" });
+    if (path === "/upload") return json({ status: "ingested", ...document });
     if (path === "/landing-preview")
       return route.fulfill({
         contentType: "text/html",
@@ -195,6 +278,22 @@ const consoleErrors = [];
     fullPage: true,
   });
   const message = page.getByRole("textbox", { name: "Message Prodigy" });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "notes.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Complete notes\nBeginning, middle and end."),
+  });
+  await page
+    .getByRole("button", { name: "Remove notes.md from question" })
+    .waitFor();
+  await page.locator(".attachment-name").click();
+  await page.getByRole("region", { name: "Preview of notes.md" }).waitFor();
+  assert.ok(
+    await page
+      .getByText("Beginning, middle and end.", { exact: false })
+      .isVisible(),
+  );
+  await page.getByRole("button", { name: "Close preview" }).click();
   await message.fill("Remember my project deadline.");
   failChat = true;
   await page.getByRole("button", { name: "Send message", exact: true }).click();
@@ -203,6 +302,11 @@ const consoleErrors = [];
     .filter({ hasText: "Service temporarily unavailable." })
     .waitFor();
   assert.equal(await message.inputValue(), "Remember my project deadline.");
+  assert.ok(
+    await page
+      .getByRole("button", { name: "Remove notes.md from question" })
+      .isVisible(),
+  );
   assert.ok(
     (await page.evaluate(() => Object.keys(localStorage))).some(
       (key) => key === "prodigy_draft_1",
@@ -214,6 +318,203 @@ const consoleErrors = [];
   assert.equal(await message.inputValue(), "");
   const chatCall = apiRequests.find((request) => request.path === "/chat");
   assert.equal(chatCall.headers["x-session-token"], "fixture-session");
+  const attempts = apiRequests.filter((request) => request.path === "/chat");
+  assert.deepEqual(attempts[0].body.attachment_keys, [document.document_key]);
+  assert.equal(attempts[0].body.request_id, attempts[1].body.request_id);
+  await page
+    .getByRole("button", { name: "Remove notes.md from question" })
+    .click();
+  assert.equal(await page.locator(".attachment-card").count(), 0);
+  assert.equal(await page.locator(".message-attachments").count(), 1);
+  await message.fill("Now without attachments");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll(".message.bot").length === 2,
+  );
+  assert.deepEqual(
+    apiRequests.filter((request) => request.path === "/chat").at(-1).body
+      .attachment_keys,
+    [],
+  );
+  streamMode = "hold";
+  await message.fill("Show a progressive reply");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page
+    .locator(".message.bot")
+    .last()
+    .getByText("Here is the next", { exact: true })
+    .waitFor();
+  assert.equal(await message.inputValue(), "Show a progressive reply");
+  assert.equal(
+    await page
+      .locator(".message.bot")
+      .last()
+      .getByRole("button", { name: "Copy", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Send message", exact: true })
+      .isDisabled(),
+    true,
+  );
+  streamMode = "normal";
+  releaseStream();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('textarea[aria-label="Message Prodigy"]').value ===
+      "",
+  );
+  assert.equal(
+    await page
+      .locator(".message.bot")
+      .last()
+      .locator(".message-body")
+      .textContent(),
+    "Here is the next step for your project.",
+  );
+  streamMode = "drop-confirmation";
+  await message.fill("Recover a reply after losing its confirmation");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "interrupted before it was confirmed saved" })
+    .waitFor();
+  assert.equal(
+    await message.inputValue(),
+    "Recover a reply after losing its confirmation",
+  );
+  assert.equal(await page.locator(".message.bot").count(), 3);
+  const interruptedId = apiRequests
+    .filter((request) => request.path === "/chat")
+    .at(-1).body.request_id;
+  streamMode = "normal";
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('textarea[aria-label="Message Prodigy"]').value ===
+      "",
+  );
+  assert.equal(
+    apiRequests.filter((request) => request.path === "/chat").at(-1).body
+      .request_id,
+    interruptedId,
+  );
+  assert.equal(await page.locator(".message.bot").count(), 4);
+  replyText = [
+    "## A readable reply",
+    "",
+    "This has **bold text** and `inline code`.",
+    "",
+    "- First item",
+    "- Second item",
+    "",
+    "1. One step",
+    "2. Another step",
+    "",
+    "> A useful quotation",
+    "",
+    "```python",
+    'print("Hello")',
+    "```",
+    "",
+    "| Name | Value |",
+    "| --- | --- |",
+    "| Memory | Persistent |",
+    "",
+    "[Documentation](https://example.com/docs)",
+    "",
+    "[Unsafe link](javascript:alert(1))",
+    "",
+    "![External image](https://example.com/tracker.png)",
+    "",
+    "<script>window.markdownInjected = true</script>",
+  ].join("\n");
+  await message.fill("Show **this user text literally**");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('textarea[aria-label="Message Prodigy"]').value ===
+      "",
+  );
+  const markdown = page.locator(".message.bot").last().locator(".message-body");
+  assert.equal(
+    await markdown.getByRole("heading", { name: "A readable reply" }).count(),
+    1,
+  );
+  assert.equal(await markdown.locator("strong").textContent(), "bold text");
+  assert.equal(await markdown.locator("ul > li").count(), 2);
+  assert.equal(await markdown.locator("ol > li").count(), 2);
+  assert.equal(
+    await markdown.locator("blockquote").textContent(),
+    "\nA useful quotation\n",
+  );
+  assert.equal(
+    (await markdown.locator("pre code").textContent()).trim(),
+    'print("Hello")',
+  );
+  assert.equal(await markdown.getByRole("table").count(), 1);
+  assert.equal(
+    await markdown
+      .getByRole("link", { name: "Documentation", exact: true })
+      .getAttribute("target"),
+    "_blank",
+  );
+  assert.ok(
+    !(
+      (await markdown
+        .getByText("Unsafe link", { exact: true })
+        .getAttribute("href")) || ""
+    ).startsWith("javascript:"),
+  );
+  assert.equal(await markdown.locator("script, img").count(), 0);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page
+    .locator(".message.bot")
+    .last()
+    .getByRole("button", { name: "Copy", exact: true })
+    .click();
+  const copiedReply = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(copiedReply.includes("A readable reply"));
+  assert.ok(copiedReply.includes('print("Hello")'));
+  assert.ok(!copiedReply.includes("## A readable reply"));
+  assert.ok(!copiedReply.includes("**bold text**"));
+  assert.equal(await page.evaluate(() => window.markdownInjected), undefined);
+  assert.equal(
+    await page
+      .locator(".message.user")
+      .last()
+      .locator(".message-body")
+      .textContent(),
+    "Show **this user text literally**",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+    false,
+  );
+  await page.screenshot({
+    path: path.join(artifactDir, "markdown-mobile.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page
+    .getByRole("button", { name: "Saved documents", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Attach", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Remove notes.md from question" })
+    .waitFor();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Remove notes.md from question" })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Remove notes.md from question" })
+    .click();
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   await page
     .getByRole("heading", { name: "Review project notes", exact: true })
@@ -238,6 +539,19 @@ const consoleErrors = [];
     true,
   );
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByLabel("Edit user.md")
+    .fill("# Preferences\n- Use detailed examples");
+  await page
+    .getByRole("switch", { name: "Update user memory from conversations" })
+    .click();
+  await page.getByRole("button", { name: "Save memory", exact: true }).click();
+  await page.getByText("Your user.md memory has been saved.").waitFor();
+  assert.equal(userMemory.markdown, "# Preferences\n- Use detailed examples");
+  assert.equal(userMemory.auto_update, false);
+  const downloadReady = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download user.md" }).click();
+  assert.equal((await downloadReady).suggestedFilename(), "user.md");
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await page
     .getByRole("switch", { name: "Compact interface", exact: true })
@@ -316,7 +630,7 @@ const consoleErrors = [];
   );
   assert.deepEqual(consoleErrors, []);
   console.log(
-    "PASS: desktop/mobile navigation, chat retry and draft retention, task status, calendar ranges, profile save, persistent theme/compact preferences, account logout, 6 landing capabilities, 4 workflow steps, all original privacy sections plus Google data disclosure, no runtime errors or horizontal overflow.",
+    "PASS: progressive streaming, provisional replies, lost-confirmation recovery, attachment and draft retention, memory editing, desktop/mobile navigation, account logout, no runtime errors or horizontal overflow.",
   );
   await browser.close();
 })()
@@ -327,4 +641,6 @@ const consoleErrors = [];
   .finally(async () => {
     if (browser) await browser.close();
     server.kill();
+    streamServer.closeAllConnections();
+    streamServer.close();
   });

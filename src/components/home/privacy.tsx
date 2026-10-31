@@ -129,10 +129,11 @@ export default function PrivacyPolicy(): React.JSX.Element {
                 Documents and files
               </h3>
               <p className="text-sm text-[var(--muted)] leading-relaxed">
-                You may upload PDFs and notes. These are parsed, chunked, and
-                stored as vector embeddings in a ChromaDB vector database. File
-                content may be retained to support accurate retrieval and
-                question-answering.
+                Uploaded PDFs, text and Markdown are retained as complete
+                extracted text in your account database and indexed in Chroma
+                Cloud. Attached documents are sent in full to the AI provider
+                with your question. Removing an attachment excludes its full
+                text from the question but does not delete the saved document.
               </p>
             </div>
             <div className="p-5 md:p-6 bg-[var(--accent-soft)] border border-[var(--line)] rounded-xl">
@@ -144,7 +145,9 @@ export default function PrivacyPolicy(): React.JSX.Element {
                 memory across sessions. This includes messages you send and
                 AI-generated responses. Conversation summaries may also be
                 stored in the vector database to support long-term memory
-                retrieval.
+                retrieval. A separate user.md memory records facts and
+                preferences from your messages. You can review, edit, clear,
+                download or pause updates to this Markdown in Settings.
               </p>
             </div>
             <div className="p-5 md:p-6 bg-[var(--accent-soft)] border border-[var(--line)] rounded-xl">
@@ -291,10 +294,11 @@ export default function PrivacyPolicy(): React.JSX.Element {
             </h2>
           </div>
           <p className="text-[var(--text)] text-[15.2px] leading-relaxed">
-            Production account information, conversations and memory summaries
-            are stored in PostgreSQL. Document content and memory embeddings are
-            stored in Chroma Cloud. Device preferences and optional unsent
-            drafts are stored in your browser.
+            Production account information, conversations, full extracted
+            document text, user.md and memory summaries are stored in
+            PostgreSQL. Document chunks and memory embeddings are stored in
+            Chroma Cloud. Device preferences and optional unsent drafts,
+            including attachment IDs and filenames, are stored in your browser.
           </p>
           <div className="mt-5 p-4.5 border-l-2 border-[var(--accent)] bg-[var(--accent-soft)] rounded-r-lg">
             <p className="text-sm text-[var(--muted)] italic">

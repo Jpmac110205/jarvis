@@ -6,6 +6,7 @@ import {
 import type { Preferences } from "../../contexts/usePreferences";
 import { useGoogleData } from "../../contexts/useGoogleData";
 import { apiRequest } from "../../services/api";
+import { UserMemoryPanel } from "./UserMemory";
 
 export function SettingsPanel() {
   const { preferences, save } = usePreferences();
@@ -260,6 +261,7 @@ export function SettingsPanel() {
           </button>
         </div>
       </section>
+      {user && <UserMemoryPanel />}
       <section className="surface">
         <h3>How memory works</h3>
         <div className="memory-explanation">

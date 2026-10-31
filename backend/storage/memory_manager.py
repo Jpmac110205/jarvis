@@ -28,7 +28,7 @@ def get_conversational_context(chat_history, n=10):
     return chat_history[-n:] if n > 0 else []
 
 
-def store_memory(summary, user_id, conn, embedding_id):
+def store_memory(summary, user_id, conn, embedding_id, sync_index=True):
     if not user_id or not summary.strip() or not embedding_id:
         raise ValueError("A memory requires an owner, content and stable ID")
     now = datetime.now(timezone.utc).isoformat()
@@ -38,7 +38,8 @@ def store_memory(summary, user_id, conn, embedding_id):
         (user_id, summary.strip(), embedding_id, now, now),
     )
     conn.commit()  # retain the summary even when embeddings/network are unavailable
-    sync_memory_index(conn, user_id)
+    if sync_index:
+        sync_memory_index(conn, user_id)
 
 
 def sync_memory_index(conn, user_id, limit=50):
@@ -46,7 +47,8 @@ def sync_memory_index(conn, user_id, limit=50):
 
     The SQL tier validates search hits during a partial move. Never delete SQL content
     as compensation for a vector failure: it is the durable recovery source.
-    Call under serialized_chat, or from the maintenance command while it holds that lock.
+    Maintenance workers own a per-account job lease. Chat may update SQL tiers
+    concurrently, so a changed tier must remain pending for another indexing pass.
     """
     rows = conn.execute(
         """SELECT embedding_id, content, tier, created_at FROM memories
@@ -78,14 +80,24 @@ def sync_memory_index(conn, user_id, limit=50):
                 ids=[vector_id],
             )
             get_store(source).delete(ids=[vector_id])
-            conn.execute(
+            changed = conn.execute(
                 "UPDATE memories SET indexed_tier = ? WHERE user_id = ? AND embedding_id = ? AND tier = ?",
                 (tier, user_id, embedding_id, tier),
-            )
+            ).rowcount
+            if not changed:
+                conn.execute(
+                    "UPDATE memories SET indexed_tier = NULL WHERE user_id = ? AND embedding_id = ?",
+                    (user_id, embedding_id),
+                )
             conn.commit()
             synced += 1
         except Exception:
             conn.rollback()
+            conn.execute(
+                "UPDATE memories SET indexed_tier = NULL WHERE user_id = ? AND embedding_id = ?",
+                (user_id, embedding_id),
+            )
+            conn.commit()
             logger.exception("Memory indexing deferred; SQL content retained")
             # A service outage should not make fifty identical network requests.
             break
@@ -109,9 +121,11 @@ def search_memory_tier(query, collection, user_id, k=2):
         return []
 
 
-def retrieve_memory(query, user_id, conn):
+def retrieve_memory(query, user_id, conn, hits=None, touch_hits=True):
     if not user_id:
         return {"context": "", "tier": "none"}
+    if hits is not None:
+        return apply_memory_hits(conn, user_id, hits, touch=touch_hits)
     context, tiers, seen = [], [], set()
     # Search both: a short-term hit must not hide relevant older information.
     for collection, tier in ((SHORT_COLLECTION, "short"), (LONG_COLLECTION, "long")):
@@ -136,6 +150,59 @@ def retrieve_memory(query, user_id, conn):
         "tier": "mixed"
         if len(set(tiers)) > 1
         else ("short_term" if tiers[0] == "short" else "long_term"),
+    }
+
+
+def touch_memories(conn, user_id, keys):
+    if not keys:
+        return
+    placeholders = ",".join("?" for _ in keys)
+    conn.execute(
+        f"UPDATE memories SET frequency = frequency + 1, last_accessed = ?, tier = 'short' WHERE user_id = ? AND embedding_id IN ({placeholders})",
+        (datetime.now(timezone.utc).isoformat(), user_id, *keys),
+    )
+
+
+def apply_memory_hits(conn, user_id, hits, touch=True):
+    """Validate in one read and touch in one transaction; worker moves vectors."""
+    keys = list(
+        {
+            doc.metadata.get("embedding_id")
+            for _, doc in hits
+            if doc.metadata.get("embedding_id")
+        }
+    )
+    if not keys:
+        return {"context": "", "tier": "none"}
+    placeholders = ",".join("?" for _ in keys)
+    rows = conn.execute(
+        f"SELECT embedding_id, content, tier FROM memories WHERE user_id = ? AND embedding_id IN ({placeholders})",
+        (user_id, *keys),
+    ).fetchall()
+    authoritative = {r[0]: (r[1], r[2]) for r in rows}
+    context, tiers, seen = [], [], set()
+    for tier, doc in hits:
+        key = doc.metadata.get("embedding_id")
+        row = authoritative.get(key)
+        if (
+            not row
+            or row[1] != tier
+            or key in seen
+            or doc.metadata.get("user_id") != user_id
+        ):
+            continue
+        seen.add(key)
+        context.append(row[0])
+        tiers.append(tier)
+    if touch:
+        touch_memories(conn, user_id, list(seen))
+        conn.commit()
+    return {
+        "context": "\n---\n".join(context),
+        "accesses": list(seen),
+        "tier": "mixed"
+        if len(set(tiers)) > 1
+        else (tiers[0] + "_term" if tiers else "none"),
     }
 
 
@@ -175,10 +242,9 @@ def demote_stale_memories(conn, user_id):
             and frequency < PROMOTION_THRESHOLD
             and compute_score(frequency, last_accessed) < SHORT_TERM_THRESHOLD
         ):
-            conn.execute(
-                "UPDATE memories SET tier = 'long' WHERE user_id = ? AND embedding_id = ?",
-                (user_id, embedding_id),
-            )
-            demoted += 1
+            demoted += conn.execute(
+                "UPDATE memories SET tier = 'long' WHERE user_id = ? AND embedding_id = ? AND frequency = ? AND last_accessed = ?",
+                (user_id, embedding_id, frequency, last_accessed),
+            ).rowcount
     conn.commit()
     return demoted
