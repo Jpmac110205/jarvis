@@ -47,7 +47,7 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 PRODUCTION = os.getenv("ENVIRONMENT") == "production" or FRONTEND_URL.startswith(
     "https://"
 )
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-luna")
 ALLOWED_MODELS = list(
     dict.fromkeys(
         [DEFAULT_MODEL]
