@@ -38,6 +38,7 @@ class LatencyTests(unittest.TestCase):
         for name, value in (
             ("ensure_user", {"display_name": "Alice"}),
             ("make_model", self.model),
+            ("classify_query", "LLM"),
             ("vector_context", {"hits": [], "documents": [], "unavailable": False}),
         ):
             self.patches.enter_context(patch.object(main, name, return_value=value))
@@ -73,6 +74,19 @@ class LatencyTests(unittest.TestCase):
             headers=self.headers,
             json={"message": "Explain vector search", **kwargs},
         )
+
+    def test_web_route_supplies_sources_in_both_response_modes(self):
+        for streaming in (False, True):
+            with (
+                patch.object(main, "classify_query", return_value="WebSearch"),
+                patch.object(main, "search_web", return_value="Finding: https://example.com/news") as search,
+            ):
+                result = self.post(stream=streaming)
+            self.assertEqual(result.status_code, 200)
+            self.assertIn("WebSearch", result.text)
+            search.assert_called_once_with("Explain vector search")
+            generation = self.model.stream if streaming else self.model.invoke
+            self.assertIn("https://example.com/news", str(generation.call_args.args[0]))
 
     def test_answer_is_one_generation_and_maintenance_is_atomic_queued_work(self):
         result = self.post(request_id=str(uuid4()))

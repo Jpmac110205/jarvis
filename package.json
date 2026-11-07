@@ -7,7 +7,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dev": "concurrently --kill-others \"npm:dev:docker\" \"npm:dev:frontend\"",
+    "dev": "node scripts/ensure-docker.mjs && concurrently --kill-others \"npm:dev:docker\" \"npm:dev:frontend\"",
     "dev:docker": "docker compose up --build backend memory-worker",
     "memory:worker": "cd backend && ../venv/bin/python -m scripts.memory_worker",
     "dev:frontend": "vite",

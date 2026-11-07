@@ -13,12 +13,17 @@
 
 ## Running locally and on Render
 
-With Docker Desktop running and credentials configured in `backend/.env`, run:
+With Docker Desktop installed and credentials configured in `backend/.env`, run:
 
 ```bash
 npm install
 npm run dev
 ```
+
+On macOS, this opens Docker Desktop automatically if needed and waits for it to
+be ready. On other platforms, start Docker before running the command.
+Docker Compose is used only for local development; production starts through
+the Dockerfile and Render configuration without this development script.
 
 Open http://localhost:8000. This starts Vite on port 8000 and the same FastAPI
 backend used in production in Docker on port 8080. Vite forwards API requests to
@@ -127,9 +132,29 @@ Prodigy determines whether a request should use:
 
 - Personal knowledge base (RAG)
 - LLM pretrained knowledge
-- Requests requiring current web information (identified; live search is not connected)
+- Live web search for current public information, with source links
 
-This reduces unnecessary retrieval while improving response quality.
+JEV classifies questions as `RAG`, `LLM`, or `WebSearch` before document retrieval.
+JEV uses OpenRouter's Decisions API, authenticated with `OPENROUTER_API_KEY`.
+Add these settings to `backend/.env` and restart the backend:
+
+```env
+OPENROUTER_API_KEY=your_openrouter_key
+JEV_MODEL=typesafe/jev-1.14
+```
+
+`JEV_MODEL` is optional and defaults to `typesafe/jev-1.14`. Recent conversation
+turns are sent to JEV to classify follow-ups; document contents are not sent.
+Attachments remain available on all routes. Missing credentials, API failures,
+or invalid decisions fall back to RAG when documents exist, otherwise LLM.
+OpenAI answer generation and web search still use `OPENAI_API_KEY`.
+
+WebSearch uses the OpenAI Responses API web search tool and the existing
+`OPENAI_API_KEY`. Set `WEB_SEARCH_MODEL` to a model supporting web search
+(defaults to `OPENAI_MODEL`). Only the current question is sent to web search;
+saved documents, memories, and calendar data are excluded. Findings and source
+URLs ground streaming and non-streaming answers. Search failures are explicitly
+reported as unverified current information.
 
 ---
 
